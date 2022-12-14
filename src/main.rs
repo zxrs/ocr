@@ -44,7 +44,7 @@ unsafe extern "system" fn wnd_proc(
     match msg {
         WM_CREATE => create(hwnd),
         WM_CLIPBOARDUPDATE => {
-            if wparam.eq(&WPARAM(3)) || wparam.eq(&WPARAM(6)) {
+            if wparam.eq(&WPARAM(3)) || wparam.eq(&WPARAM(7)) {
                 ocr(hwnd).ok();
             }
         }
