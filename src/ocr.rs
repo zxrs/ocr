@@ -37,18 +37,29 @@ pub fn scan(width: i32, height: i32, bytes_per_pixel: usize, bgr: Vec<u8>) -> Re
         .Lines()?
         .First()?
         .filter_map(|line| {
-            Some(
-                line.Text()
-                    .ok()?
-                    .as_wide()
-                    .iter()
-                    .chain(Some(&0x000d))
-                    .chain(Some(&0x000a))
-                    .cloned()
-                    .collect::<Vec<_>>(),
-            )
+            // remove unnecessary whitespace in japanese text.
+            // eg. あ い abc d ef え お => あい abc d ef えお
+            let mut s = line
+                .Text()
+                .ok()?
+                .to_string_lossy()
+                .split_ascii_whitespace()
+                .map(|s| {
+                    if s.chars().all(|c| c.is_ascii()) {
+                        format!(" {s} ")
+                    } else {
+                        s.to_owned()
+                    }
+                })
+                .collect::<String>()
+                .trim()
+                .to_owned();
+            s.push_str("\r\n");
+            Some(s)
         })
-        .flatten()
+        .collect::<String>()
+        .replace("  ", " ")
+        .encode_utf16()
         .chain(Some(0))
         .collect();
     Ok(result)
