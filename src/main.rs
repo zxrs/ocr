@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+// #![windows_subsystem = "windows"]
 
 use anyhow::Result;
 use utf16_lit::utf16_null;
@@ -44,7 +44,17 @@ unsafe extern "system" fn wnd_proc(
     match msg {
         WM_CREATE => create(hwnd),
         WM_CLIPBOARDUPDATE => {
-            if wparam.eq(&WPARAM(3)) || wparam.eq(&WPARAM(7)) {
+            // Adobe PDF reader:    WPARAM(0 | 3 | 5 | 6)
+            // Firefox:             WPARAM(6 | 4)
+            // Cut & Sketch:        WPARAM(7 | 7 | 4 | 8)
+            // Snipping Tool:       WPARAM(3 | 4)
+            // IrfanView:           WPARAM(3)
+            // if wparam.eq(&WPARAM(3)) || wparam.eq(&WPARAM(6)) || wparam.eq(&WPARAM(7)) {
+            if wparam.eq(&WPARAM(3))
+                || wparam.eq(&WPARAM(4))
+                || wparam.eq(&WPARAM(6))
+                || wparam.eq(&WPARAM(7))
+            {
                 ocr(hwnd).ok();
             }
         }
