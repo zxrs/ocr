@@ -44,7 +44,7 @@ unsafe extern "system" fn wnd_proc(
     match msg {
         WM_CREATE => create(hwnd),
         WM_CLIPBOARDUPDATE => {
-            if wparam.eq(&WPARAM(3)) && lparam.eq(&LPARAM(0)) {
+            if wparam.eq(&WPARAM(3)) || wparam.eq(&WPARAM(6)) {
                 ocr(hwnd).ok();
             }
         }
@@ -148,8 +148,10 @@ fn main() -> Result<()> {
         if !unsafe { GetMessageW(&mut msg, HWND::default(), 0, 0) }.as_bool() {
             break;
         }
-        unsafe { TranslateMessage(&msg) };
-        unsafe { DispatchMessageW(&msg) };
+        unsafe {
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
     }
     Ok(())
 }

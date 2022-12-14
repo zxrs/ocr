@@ -83,12 +83,12 @@ pub fn get() -> Result<(i32, i32, usize, Vec<u8>)> {
 
     let dib = read_bitmap_from_clipboard()?;
 
-    let width = dib.width();
-    let height = dib.height();
-    let bytes_per_pixel = dib.bytes_per_pixel();
-    let bgr = dib.to_bgr();
-
-    Ok((width, height, bytes_per_pixel, bgr))
+    Ok((
+        dib.width(),
+        dib.height(),
+        dib.bytes_per_pixel(),
+        dib.to_bgr(),
+    ))
 }
 
 pub fn set(src: &[u16]) -> Result<()> {
