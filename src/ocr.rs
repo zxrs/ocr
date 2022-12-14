@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use std::ptr;
 use std::slice;
 use windows::{
@@ -9,6 +9,8 @@ use windows::{
 };
 
 pub fn scan(width: i32, height: i32, bytes_per_pixel: usize, bgr: Vec<u8>) -> Result<Vec<u16>> {
+    ensure!(bgr.len() > bytes_per_pixel, "no data");
+
     let bmp = SoftwareBitmap::Create(BitmapPixelFormat::Bgra8, width, height)?;
     {
         let bmp_buf = bmp.LockBuffer(BitmapBufferAccessMode::Write)?;
