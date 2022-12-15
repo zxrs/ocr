@@ -1,4 +1,5 @@
 use anyhow::{ensure, Result};
+use std::io::{Cursor, Write};
 use std::ptr;
 use std::slice;
 use windows::{
@@ -33,38 +34,43 @@ pub fn scan(width: i32, height: i32, bytes_per_pixel: usize, bgr: Vec<u8>) -> Re
     }
 
     let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
-    let result = engine
+
+    let mut buf = [0u8; 4096];
+    let mut cur = Cursor::new(buf.as_mut_slice());
+    engine
         .RecognizeAsync(&bmp)?
         .get()?
         .Lines()?
         .First()?
-        .filter_map(|line| {
-            // remove unnecessary whitespace in japanese text.
-            // eg. あ い abc d ef え お => あい abc d ef えお
-            Some(
-                line.Text()
-                    .ok()?
-                    .to_string_lossy()
-                    .split_ascii_whitespace()
-                    .map(|s| {
-                        if s.chars().all(|c| c.is_ascii()) {
-                            format!(" {s} ")
-                        } else {
-                            s.to_owned()
+        .try_for_each(|line| -> Result<()> {
+            line.Text()?
+                .as_wide()
+                .split(|num| num == &32)
+                .try_for_each(|data| -> Result<()> {
+                    let data = unsafe {
+                        slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * 2)
+                    };
+                    // if ascii text, insert a space.
+                    if data.chunks(2).all(|n| n[0] < 0x80 && n[1] == 0) {
+                        let pos = cur.position() as usize;
+                        let r = cur.get_ref();
+                        if pos > 3 && (*r)[pos - 4..pos] != [0x0d, 0x00, 0x0a, 0x00] {
+                            let _ = cur.write(&[32, 0])?;
                         }
-                    })
-                    .collect::<String>()
-                    .trim()
-                    .chars()
-                    .chain(Some('\r'))
-                    .chain(Some('\n'))
-                    .collect::<String>(),
-            )
-        })
-        .collect::<String>()
-        .replace("  ", " ")
-        .encode_utf16()
-        .chain(Some(0))
-        .collect();
-    Ok(result)
+                        let _ = cur.write(data)?;
+                    } else {
+                        let _ = cur.write(data)?;
+                    }
+                    Ok(())
+                })?;
+            // \r\n
+            let _ = cur.write(&[0x0d, 0x00, 0x0a, 0x00])?;
+            Ok(())
+        })?;
+    // null termination.
+    let _ = cur.write(&[0, 0])?;
+
+    let len = cur.position() as usize / 2;
+    let result = unsafe { slice::from_raw_parts(&buf[..] as *const [u8] as *const u16, len) };
+    Ok(result.to_owned())
 }
