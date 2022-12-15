@@ -54,6 +54,7 @@ pub fn scan(width: i32, height: i32, bytes_per_pixel: usize, bgr: Vec<u8>) -> Re
                     if data.chunks(2).all(|n| n[0] < 0x80 && n[1] == 0) {
                         let pos = cur.position() as usize;
                         let r = cur.get_ref();
+                        // if the previous 4 bytes are "\r\n", do not insert a space.
                         if pos > 3 && (*r)[pos - 4..pos] != [0x0d, 0x00, 0x0a, 0x00] {
                             let _ = cur.write(&[32, 0])?;
                         }
@@ -63,7 +64,7 @@ pub fn scan(width: i32, height: i32, bytes_per_pixel: usize, bgr: Vec<u8>) -> Re
                     }
                     Ok(())
                 })?;
-            // \r\n
+            // add "\r\n"
             let _ = cur.write(&[0x0d, 0x00, 0x0a, 0x00])?;
             Ok(())
         })?;
