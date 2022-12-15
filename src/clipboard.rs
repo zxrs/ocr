@@ -37,6 +37,7 @@ impl Drop for MemoryHandle {
     }
 }
 
+#[derive(Debug)]
 struct Dib {
     width: i32,
     height: i32,

@@ -1,4 +1,4 @@
-// #![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 
 use anyhow::Result;
 use utf16_lit::utf16_null;
