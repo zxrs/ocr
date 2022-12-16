@@ -1,6 +1,7 @@
 #![windows_subsystem = "windows"]
 
 use anyhow::Result;
+use std::slice;
 use utf16_lit::utf16_null;
 use windows::Win32::UI::WindowsAndMessaging::SendMessageW;
 use windows::{
@@ -24,6 +25,7 @@ use windows::{
 };
 
 const ID_EDIT: i32 = 5456;
+const BUF_SIZE: usize = 8192;
 
 mod clipboard;
 mod ocr;
@@ -96,8 +98,12 @@ fn create(hwnd: HWND) {
 
 fn ocr(hwnd: HWND) -> Result<()> {
     let (width, height, bytes_per_pixel, bgr) = clipboard::get()?;
-    let txt = ocr::scan(width, height, bytes_per_pixel, bgr)?;
-    clipboard::set(&txt)?;
+
+    let mut buf = [0u8; BUF_SIZE];
+    let len = ocr::scan(width, height, bytes_per_pixel, bgr, &mut buf)?;
+
+    let txt = unsafe { slice::from_raw_parts(buf.as_ptr() as *const u16, len / 2) };
+    clipboard::set(txt)?;
 
     let hedit = unsafe { GetDlgItem(hwnd, ID_EDIT) };
 
