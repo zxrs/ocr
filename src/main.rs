@@ -14,12 +14,12 @@ use windows::{
             Controls::{EM_REPLACESEL, EM_SETSEL},
             WindowsAndMessaging::{
                 CreateWindowExW, DefWindowProcW, DispatchMessageW, EnumWindows, GetClientRect,
-                GetDlgItem, GetMessageW, GetWindowTextLengthW, PostQuitMessage, RegisterClassW,
-                SetForegroundWindow, ShowWindow, TranslateMessage, CW_USEDEFAULT, ES_AUTOHSCROLL,
-                ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, HMENU, MSG, SW_SHOW, WINDOW_EX_STYLE,
-                WINDOW_STYLE, WM_CLIPBOARDUPDATE, WM_CREATE, WM_DESTROY, WNDCLASSW, WS_CAPTION,
-                WS_CHILD, WS_HSCROLL, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_VISIBLE,
-                WS_VSCROLL,
+                GetDlgItem, GetMessageW, GetWindowTextLengthW, IsIconic, PostQuitMessage,
+                RegisterClassW, SetForegroundWindow, ShowWindow, TranslateMessage, CW_USEDEFAULT,
+                ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, HMENU, MSG, SW_SHOW,
+                WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLIPBOARDUPDATE, WM_CREATE, WM_DESTROY,
+                WNDCLASSW, WS_CAPTION, WS_CHILD, WS_HSCROLL, WS_MINIMIZEBOX, WS_OVERLAPPED,
+                WS_SYSMENU, WS_VISIBLE, WS_VSCROLL,
             },
         },
     },
@@ -136,6 +136,9 @@ unsafe extern "system" fn enum_win(hwnd: HWND, lparam: LPARAM) -> BOOL {
     GetWindowTextW(hwnd, &mut buf);
     if buf.starts_with(TITLE) {
         if lparam.0 > 0 {
+            if IsIconic(hwnd).as_bool() {
+                ShowWindow(hwnd, SW_SHOW);
+            }
             SetForegroundWindow(hwnd);
         }
         return false.into();
