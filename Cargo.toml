@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 utf16_lit = "2.0"
+bit_field = "0.10"
 
 [dependencies.windows]
 version = "0.43"
