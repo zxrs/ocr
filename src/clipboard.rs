@@ -138,17 +138,7 @@ impl Dib {
 
 pub fn get() -> Result<(i32, i32, Vec<u8>)> {
     ensure!(is_bitmap_on_clipboard_data(), "not bitmap data");
-
     let dib = read_bitmap_from_clipboard()?;
-    // println!(
-    //     "{}, {}, {}, {}",
-    //     dib.width(),
-    //     dib.height(),
-    //     dib.bits_per_pixel,
-    //     dib.data.len(),
-    //     dib.data
-    // );
-
     Ok((dib.width(), dib.height(), dib.to_bgr()?))
 }
 
@@ -229,10 +219,6 @@ fn scan_line_bytes_count_with_padding_test() {
 
 #[test]
 fn bit_iterator_test() {
-    // let bits: u8 = 0b1000_0000;
-    // dbg!(bits << 0);
-    // dbg!(bits >> 7);
-
     let s: [u8; 4] = [0b1001_1110, 0b1100_1100, 0, 0];
     let mut iter = BitIterator::new(&s, 10);
     assert_eq!(iter.next(), Some(1));
