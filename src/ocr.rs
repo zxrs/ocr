@@ -1,5 +1,5 @@
 use super::BUF_SIZE;
-use anyhow::{ensure, Result};
+use anyhow::Result;
 use std::io::{Cursor, Write};
 use std::ptr;
 use std::slice;
@@ -10,15 +10,7 @@ use windows::{
     Win32::System::WinRT::IMemoryBufferByteAccess,
 };
 
-pub fn scan(
-    width: i32,
-    height: i32,
-    bytes_per_pixel: usize,
-    bgr: Vec<u8>,
-    buf: &mut [u8],
-) -> Result<usize> {
-    ensure!(bgr.len() > bytes_per_pixel, "no data");
-
+pub fn scan(width: i32, height: i32, bgr: Vec<u8>, buf: &mut [u8]) -> Result<usize> {
     let bmp = SoftwareBitmap::Create(BitmapPixelFormat::Bgra8, width, height)?;
     {
         let bmp_buf = bmp.LockBuffer(BitmapBufferAccessMode::Write)?;
@@ -33,10 +25,10 @@ pub fn scan(
 
         let slice = unsafe { slice::from_raw_parts_mut(data, capacity as usize) };
         slice.chunks_mut(4).enumerate().for_each(|(i, c)| {
-            c[0] = bgr[bytes_per_pixel * i];
-            c[1] = bgr[bytes_per_pixel * i + 1];
-            c[2] = bgr[bytes_per_pixel * i + 2];
-            c[3] = 0;
+            c[0] = bgr[3 * i];
+            c[1] = bgr[3 * i + 1];
+            c[2] = bgr[3 * i + 2];
+            c[3] = 255;
         });
     }
 
