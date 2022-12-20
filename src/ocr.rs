@@ -10,7 +10,7 @@ use windows::{
     Win32::System::WinRT::IMemoryBufferByteAccess,
 };
 
-pub fn scan(width: i32, height: i32, bgr: Vec<u8>, buf: &mut [u8]) -> Result<usize> {
+pub fn scan(width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) -> Result<usize> {
     let bmp = SoftwareBitmap::Create(BitmapPixelFormat::Bgra8, width, height)?;
     {
         let bmp_buf = bmp.LockBuffer(BitmapBufferAccessMode::Write)?;
@@ -24,12 +24,7 @@ pub fn scan(width: i32, height: i32, bgr: Vec<u8>, buf: &mut [u8]) -> Result<usi
         assert_eq!((width * height * 4).abs(), capacity as i32);
 
         let slice = unsafe { slice::from_raw_parts_mut(data, capacity as usize) };
-        slice.chunks_mut(4).enumerate().for_each(|(i, c)| {
-            c[0] = bgr[3 * i];
-            c[1] = bgr[3 * i + 1];
-            c[2] = bgr[3 * i + 2];
-            c[3] = 255;
-        });
+        slice.clone_from_slice(&bgra);
     }
 
     let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;

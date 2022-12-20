@@ -1,5 +1,4 @@
 use anyhow::{anyhow, ensure, Result};
-use std::io::{Cursor, Write};
 use std::ptr;
 use std::slice;
 use windows::Win32::{
@@ -40,17 +39,12 @@ impl Drop for MemoryHandle {
 
 struct BitIterator<'a> {
     slice: &'a [u8],
-    width: i32,
     index: usize,
 }
 
 impl<'a> BitIterator<'a> {
-    fn new(slice: &'a [u8], width: i32) -> Self {
-        Self {
-            slice,
-            width,
-            index: 0,
-        }
+    fn new(slice: &'a [u8]) -> Self {
+        Self { slice, index: 0 }
     }
 }
 
@@ -58,10 +52,6 @@ impl<'a> Iterator for BitIterator<'a> {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.width as usize {
-            return None;
-        }
-
         let byte_index = self.index / 8;
         let bit_index = self.index % 8;
 
@@ -95,36 +85,31 @@ impl Dib {
         (self.width as usize * self.bits_per_pixel as usize + 31) / 32 * 4
     }
 
-    fn to_bgr(&self) -> Result<Vec<u8>> {
-        let mut iter = self
+    fn to_bgra(&self) -> Result<Vec<u8>> {
+        let iter = self
             .data
             .chunks(self.scan_line_bytes_count_with_padding())
             .rev();
-        let mut result = Vec::with_capacity(self.width as usize * self.height as usize * 3);
-        let mut cur = Cursor::new(&mut result);
-        match self.bits_per_pixel {
-            32 => iter.try_for_each(|s| {
-                s.chunks(4).try_for_each(|p| -> Result<()> {
-                    let _ = cur.write(&p[0..3])?;
-                    Ok(())
-                })
-            })?,
+        let result = match self.bits_per_pixel {
+            32 => iter.flatten().cloned().collect(),
             24 => iter
-                .map(|s| &s[0..self.width as usize * 3])
-                .try_for_each(|s| -> Result<()> {
-                    let _ = cur.write(s)?;
-                    Ok(())
-                })?,
-            1 => iter.try_for_each(|s| {
-                BitIterator::new(s, self.width).try_for_each(|b| -> Result<()> {
-                    if b > 0 {
-                        let _ = cur.write(&[255, 255, 255])?;
-                    } else {
-                        let _ = cur.write(&[0, 0, 0])?;
-                    }
-                    Ok(())
+                .flat_map(|s| {
+                    s[0..self.width as usize * 3]
+                        .chunks(3)
+                        .flat_map(|p| [p[0], p[1], p[2], 255])
                 })
-            })?,
+                .collect(),
+            1 => iter
+                .flat_map(|s| {
+                    BitIterator::new(s).take(self.width as usize).flat_map(|n| {
+                        if n > 0 {
+                            [255; 4]
+                        } else {
+                            [0; 4]
+                        }
+                    })
+                })
+                .collect(),
             _ => {
                 return Err(anyhow!(
                     "{} bits per pixel image is not yet supported.",
@@ -139,7 +124,7 @@ impl Dib {
 pub fn get() -> Result<(i32, i32, Vec<u8>)> {
     ensure!(is_bitmap_on_clipboard_data(), "not bitmap data");
     let dib = read_bitmap_from_clipboard()?;
-    Ok((dib.width(), dib.height(), dib.to_bgr()?))
+    Ok((dib.width(), dib.height(), dib.to_bgra()?))
 }
 
 pub fn set(src: &[u16]) -> Result<()> {
@@ -220,7 +205,7 @@ fn scan_line_bytes_count_with_padding_test() {
 #[test]
 fn bit_iterator_test() {
     let s: [u8; 4] = [0b1001_1110, 0b1100_1100, 0, 0];
-    let mut iter = BitIterator::new(&s, 10);
+    let mut iter = BitIterator::new(&s).take(10);
     assert_eq!(iter.next(), Some(1));
     assert_eq!(iter.next(), Some(0));
     assert_eq!(iter.next(), Some(0));
