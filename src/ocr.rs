@@ -18,9 +18,8 @@ pub fn scan(width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) -> Result<us
 
         let mut data = ptr::null_mut();
         let mut capacity = 0;
-        unsafe {
-            array.GetBuffer(&mut data, &mut capacity)?;
-        }
+        unsafe { array.GetBuffer(&mut data, &mut capacity)? };
+
         assert_eq!((width * height * 4).abs(), capacity as i32);
 
         let slice = unsafe { slice::from_raw_parts_mut(data, capacity as usize) };

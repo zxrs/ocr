@@ -122,7 +122,7 @@ impl Dib {
 }
 
 pub fn get() -> Result<(i32, i32, Vec<u8>)> {
-    ensure!(is_bitmap_on_clipboard_data(), "not bitmap data");
+    ensure!(is_bitmap_on_clipboard(), "not bitmap data");
     let dib = read_bitmap_from_clipboard()?;
     Ok((dib.width(), dib.height(), dib.to_bgra()?))
 }
@@ -148,7 +148,7 @@ pub fn set(src: &[u16]) -> Result<()> {
     Ok(())
 }
 
-fn is_bitmap_on_clipboard_data() -> bool {
+fn is_bitmap_on_clipboard() -> bool {
     unsafe { IsClipboardFormatAvailable(CF_DIB.0).as_bool() }
 }
 

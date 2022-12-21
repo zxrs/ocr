@@ -3,7 +3,6 @@
 use anyhow::Result;
 use std::slice;
 use utf16_lit::utf16_null;
-use windows::Win32::UI::WindowsAndMessaging::{GetWindowTextW, SendMessageW};
 use windows::{
     core::PCWSTR,
     w,
@@ -14,12 +13,12 @@ use windows::{
             Controls::{EM_REPLACESEL, EM_SETSEL},
             WindowsAndMessaging::{
                 CreateWindowExW, DefWindowProcW, DispatchMessageW, EnumWindows, GetClientRect,
-                GetDlgItem, GetMessageW, GetWindowTextLengthW, IsIconic, PostQuitMessage,
-                RegisterClassW, SetForegroundWindow, ShowWindow, TranslateMessage, CW_USEDEFAULT,
-                ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, HMENU, MSG, SW_SHOW,
-                WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLIPBOARDUPDATE, WM_CREATE, WM_DESTROY,
-                WNDCLASSW, WS_CAPTION, WS_CHILD, WS_HSCROLL, WS_MINIMIZEBOX, WS_OVERLAPPED,
-                WS_SYSMENU, WS_VISIBLE, WS_VSCROLL,
+                GetDlgItem, GetMessageW, GetWindowTextLengthW, GetWindowTextW, IsIconic,
+                PostQuitMessage, RegisterClassW, SendMessageW, SetForegroundWindow, ShowWindow,
+                TranslateMessage, CW_USEDEFAULT, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE,
+                ES_WANTRETURN, HMENU, MSG, SW_SHOW, WINDOW_EX_STYLE, WINDOW_STYLE,
+                WM_CLIPBOARDUPDATE, WM_CREATE, WM_DESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD,
+                WS_HSCROLL, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_VISIBLE, WS_VSCROLL,
             },
         },
     },
@@ -52,7 +51,6 @@ unsafe extern "system" fn wnd_proc(
             // Cut & Sketch:        WPARAM(7 | 7 | 4 | 8)
             // Snipping Tool:       WPARAM(3 | 4)
             // IrfanView:           WPARAM(3)
-            // if wparam.eq(&WPARAM(3)) || wparam.eq(&WPARAM(6)) || wparam.eq(&WPARAM(7)) {
             if wparam.eq(&WPARAM(3))
                 || wparam.eq(&WPARAM(4))
                 || wparam.eq(&WPARAM(6))
@@ -98,10 +96,10 @@ fn create(hwnd: HWND) {
 }
 
 fn ocr(hwnd: HWND) -> Result<()> {
-    let (width, height, bgr) = clipboard::get()?;
+    let (width, height, bgra) = clipboard::get()?;
 
     let mut buf = [0u8; BUF_SIZE];
-    let len = ocr::scan(width, height, bgr, &mut buf)?;
+    let len = ocr::scan(width, height, bgra, &mut buf)?;
 
     let txt = unsafe { slice::from_raw_parts(buf.as_ptr() as *const u16, len / 2) };
     clipboard::set(txt)?;
