@@ -10,7 +10,7 @@ use windows::Win32::{
             OpenClipboard, SetClipboardData,
         },
         Memory::{GlobalAlloc, GlobalFree, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
-        SystemServices::{CF_DIB, CF_UNICODETEXT},
+        Ole::{CF_DIB, CF_UNICODETEXT},
     },
 };
 
@@ -143,20 +143,20 @@ pub fn set(src: &[u16]) -> Result<()> {
     unsafe {
         ptr::copy_nonoverlapping(src.as_ptr() as *const u8, dst, src.len() * 2);
         GlobalUnlock(h_mem.0);
-        SetClipboardData(CF_UNICODETEXT.0, HANDLE(h_mem.0))?;
+        SetClipboardData(CF_UNICODETEXT.0 as u32, HANDLE(h_mem.0))?;
     }
     Ok(())
 }
 
 fn is_bitmap_on_clipboard() -> bool {
-    unsafe { IsClipboardFormatAvailable(CF_DIB.0).as_bool() }
+    unsafe { IsClipboardFormatAvailable(CF_DIB.0 as u32).as_bool() }
 }
 
 fn read_bitmap_from_clipboard() -> Result<Dib> {
     unsafe { OpenClipboard(None).ok()? };
     let _clip = Clipboard;
 
-    let handle = unsafe { GetClipboardData(CF_DIB.0)? };
+    let handle = unsafe { GetClipboardData(CF_DIB.0 as u32)? };
     let bitmap = unsafe { GlobalLock(handle.0) };
     ensure!(!bitmap.is_null(), "failed to global lock.");
     let _handle = Handle(handle);
