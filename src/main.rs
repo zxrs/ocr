@@ -7,7 +7,7 @@ use windows::{
     core::PCWSTR,
     w,
     Win32::{
-        Foundation::{BOOL, HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM},
+        Foundation::{BOOL, HMODULE, HWND, LPARAM, LRESULT, RECT, WPARAM},
         System::DataExchange::{AddClipboardFormatListener, RemoveClipboardFormatListener},
         UI::{
             Controls::{EM_REPLACESEL, EM_SETSEL},
@@ -87,7 +87,7 @@ fn create(hwnd: HWND) {
             rc.bottom,
             hwnd,
             HMENU(ID_EDIT as isize),
-            HINSTANCE::default(),
+            HMODULE::default(),
             None,
         )
     };
@@ -178,7 +178,7 @@ fn main() -> Result<()> {
             480,
             HWND::default(),
             HMENU::default(),
-            HINSTANCE::default(),
+            HMODULE::default(),
             None,
         )
     };

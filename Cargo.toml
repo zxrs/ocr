@@ -8,7 +8,7 @@ anyhow = "1.0"
 utf16_lit = "2.0"
 
 [dependencies.windows]
-version = "0.44"
+version = "0.48"
 features = [
     "Graphics_Imaging",
     "Foundation",

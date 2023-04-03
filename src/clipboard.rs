@@ -2,7 +2,7 @@ use anyhow::{anyhow, ensure, Result};
 use std::ptr;
 use std::slice;
 use windows::Win32::{
-    Foundation::HANDLE,
+    Foundation::{HANDLE, HGLOBAL},
     Graphics::Gdi::BITMAPINFO,
     System::{
         DataExchange::{
@@ -22,18 +22,18 @@ impl Drop for Clipboard {
 }
 
 #[derive(Debug)]
-struct Handle(HANDLE);
+struct Handle(HGLOBAL);
 impl Drop for Handle {
     fn drop(&mut self) {
-        unsafe { GlobalUnlock(self.0 .0) };
+        unsafe { GlobalUnlock(self.0) };
     }
 }
 
 #[derive(Debug)]
-struct MemoryHandle(isize);
+struct MemoryHandle(HGLOBAL);
 impl Drop for MemoryHandle {
     fn drop(&mut self) {
-        unsafe { GlobalFree(self.0) };
+        unsafe { GlobalFree(self.0).ok() };
     }
 }
 
@@ -133,8 +133,8 @@ pub fn set(src: &[u16]) -> Result<()> {
 
     unsafe { EmptyClipboard().ok()? };
 
-    let h_mem = unsafe { GlobalAlloc(GMEM_MOVEABLE, src.len() * 2) };
-    ensure!(h_mem != 0, "failed to global alloc.");
+    let h_mem = unsafe { GlobalAlloc(GMEM_MOVEABLE, src.len() * 2)? };
+    ensure!(!h_mem.is_invalid(), "failed to global alloc.");
     let h_mem = MemoryHandle(h_mem);
 
     let dst = unsafe { GlobalLock(h_mem.0) } as *mut u8;
@@ -143,7 +143,7 @@ pub fn set(src: &[u16]) -> Result<()> {
     unsafe {
         ptr::copy_nonoverlapping(src.as_ptr() as *const u8, dst, src.len() * 2);
         GlobalUnlock(h_mem.0);
-        SetClipboardData(CF_UNICODETEXT.0 as u32, HANDLE(h_mem.0))?;
+        SetClipboardData(CF_UNICODETEXT.0 as u32, HANDLE(h_mem.0 .0))?;
     }
     Ok(())
 }
@@ -157,7 +157,8 @@ fn read_bitmap_from_clipboard() -> Result<Dib> {
     let _clip = Clipboard;
 
     let handle = unsafe { GetClipboardData(CF_DIB.0 as u32)? };
-    let bitmap = unsafe { GlobalLock(handle.0) };
+    let handle = HGLOBAL(handle.0);
+    let bitmap = unsafe { GlobalLock(handle) };
     ensure!(!bitmap.is_null(), "failed to global lock.");
     let _handle = Handle(handle);
 

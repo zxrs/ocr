@@ -4,7 +4,7 @@ use std::io::{Cursor, Write};
 use std::ptr;
 use std::slice;
 use windows::{
-    core::Interface,
+    core::ComInterface,
     Graphics::Imaging::{BitmapBufferAccessMode, BitmapPixelFormat, SoftwareBitmap},
     Media::Ocr::OcrEngine,
     Win32::System::WinRT::IMemoryBufferByteAccess,
