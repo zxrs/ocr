@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+//#![windows_subsystem = "windows"]
 
 use anyhow::Result;
 use std::slice;
@@ -6,25 +6,29 @@ use utf16_lit::utf16_null;
 use windows::{
     core::PCWSTR,
     w,
+    Media::Ocr::OcrEngine,
     Win32::{
         Foundation::{BOOL, HMODULE, HWND, LPARAM, LRESULT, RECT, WPARAM},
+        Graphics::Gdi::{GetSysColorBrush, COLOR_MENUBAR},
         System::DataExchange::{AddClipboardFormatListener, RemoveClipboardFormatListener},
         UI::{
-            Controls::{EM_REPLACESEL, EM_SETSEL},
+            Controls::{EM_REPLACESEL, EM_SETSEL, WC_COMBOBOXW},
             WindowsAndMessaging::{
                 CreateWindowExW, DefWindowProcW, DispatchMessageW, EnumWindows, GetClientRect,
                 GetDlgItem, GetMessageW, GetWindowTextLengthW, GetWindowTextW, IsIconic,
                 PostQuitMessage, RegisterClassW, SendMessageW, SetForegroundWindow, ShowWindow,
-                TranslateMessage, CW_USEDEFAULT, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE,
-                ES_WANTRETURN, HMENU, MSG, SW_SHOW, WINDOW_EX_STYLE, WINDOW_STYLE,
-                WM_CLIPBOARDUPDATE, WM_CREATE, WM_DESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD,
-                WS_HSCROLL, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_VISIBLE, WS_VSCROLL,
+                TranslateMessage, CBS_DROPDOWNLIST, CBS_HASSTRINGS, CB_ADDSTRING, CB_SELECTSTRING,
+                CW_USEDEFAULT, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, HMENU,
+                MSG, SW_SHOW, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLIPBOARDUPDATE, WM_CREATE,
+                WM_DESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_STATICEDGE, WS_HSCROLL,
+                WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_VISIBLE, WS_VSCROLL,
             },
         },
     },
 };
 
 const ID_EDIT: i32 = 5456;
+const ID_COMBO: i32 = 5457;
 const BUF_SIZE: usize = 8192;
 
 mod clipboard;
@@ -65,6 +69,53 @@ unsafe extern "system" fn wnd_proc(
     LRESULT::default()
 }
 
+fn create_combobox(hwnd: HWND) -> Result<()> {
+    let hwnd = unsafe {
+        CreateWindowExW(
+            WS_EX_STATICEDGE,
+            WC_COMBOBOXW,
+            w!(""),
+            WINDOW_STYLE((CBS_DROPDOWNLIST | CBS_HASSTRINGS) as u32)
+                | WS_CHILD
+                | WS_VISIBLE
+                | WS_VSCROLL,
+            2,
+            2,
+            120,
+            200,
+            hwnd,
+            HMENU(ID_COMBO as isize),
+            HMODULE::default(),
+            None,
+        )
+    };
+    let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
+    let lang = engine.RecognizerLanguage()?;
+
+    OcrEngine::AvailableRecognizerLanguages()?
+        .First()?
+        .filter_map(|lang| lang.LanguageTag().ok())
+        .for_each(|hstr| unsafe {
+            SendMessageW(
+                hwnd,
+                CB_ADDSTRING,
+                WPARAM::default(),
+                LPARAM(hstr.as_ptr() as isize),
+            );
+        });
+
+    unsafe {
+        SendMessageW(
+            hwnd,
+            CB_SELECTSTRING,
+            WPARAM::default(),
+            LPARAM(lang.LanguageTag()?.as_ptr() as isize),
+        )
+    };
+
+    Ok(())
+}
+
 fn create(hwnd: HWND) {
     let mut rc = RECT::default();
     unsafe { GetClientRect(hwnd, &mut rc) };
@@ -82,16 +133,16 @@ fn create(hwnd: HWND) {
                 | WS_VSCROLL
                 | WS_HSCROLL,
             0,
-            0,
+            30,
             rc.right,
-            rc.bottom,
+            rc.bottom - 30,
             hwnd,
             HMENU(ID_EDIT as isize),
             HMODULE::default(),
             None,
         )
     };
-
+    create_combobox(hwnd).ok();
     unsafe { AddClipboardFormatListener(hwnd) };
 }
 
@@ -99,7 +150,7 @@ fn ocr(hwnd: HWND) -> Result<()> {
     let (width, height, bgra) = clipboard::get()?;
 
     let mut buf = [0u8; BUF_SIZE];
-    let len = ocr::scan(width, height, bgra, &mut buf)?;
+    let len = ocr::scan(hwnd, width, height, bgra, &mut buf)?;
 
     let txt = unsafe { slice::from_raw_parts(buf.as_ptr() as *const u16, len / 2) };
     clipboard::set(txt)?;
@@ -161,6 +212,7 @@ fn main() -> Result<()> {
     let wc = WNDCLASSW {
         lpfnWndProc: Some(wnd_proc),
         lpszClassName: CLASS_NAME,
+        hbrBackground: unsafe { GetSysColorBrush(COLOR_MENUBAR) },
         ..Default::default()
     };
 

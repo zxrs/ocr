@@ -1,16 +1,23 @@
-use super::BUF_SIZE;
+use super::{BUF_SIZE, ID_COMBO};
 use anyhow::Result;
 use std::io::{Cursor, Write};
 use std::ptr;
 use std::slice;
 use windows::{
-    core::ComInterface,
+    core::{ComInterface, HSTRING},
+    Globalization::Language,
     Graphics::Imaging::{BitmapBufferAccessMode, BitmapPixelFormat, SoftwareBitmap},
     Media::Ocr::OcrEngine,
-    Win32::System::WinRT::IMemoryBufferByteAccess,
+    Win32::{
+        Foundation::{HWND, LPARAM, WPARAM},
+        System::WinRT::IMemoryBufferByteAccess,
+        UI::WindowsAndMessaging::{
+            GetDlgItem, SendMessageW, CB_GETCURSEL, CB_GETLBTEXT, CB_GETLBTEXTLEN,
+        },
+    },
 };
 
-pub fn scan(width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) -> Result<usize> {
+pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) -> Result<usize> {
     let bmp = SoftwareBitmap::Create(BitmapPixelFormat::Bgra8, width, height)?;
     {
         let bmp_buf = bmp.LockBuffer(BitmapBufferAccessMode::Write)?;
@@ -26,8 +33,28 @@ pub fn scan(width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) -> Result<us
         slice.clone_from_slice(&bgra);
     }
 
-    let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
+    //let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
 
+    let lang_tag = unsafe {
+        let hctrl = GetDlgItem(hwnd, ID_COMBO);
+        let index =
+            SendMessageW(hctrl, CB_GETCURSEL, WPARAM::default(), LPARAM::default()).0 as usize;
+        //dbg!(index);
+        let len = SendMessageW(hctrl, CB_GETLBTEXTLEN, WPARAM(index), LPARAM::default()).0 as usize;
+        //dbg!(len);
+        let mut buf = vec![0u16; len + 1];
+        SendMessageW(
+            hctrl,
+            CB_GETLBTEXT,
+            WPARAM(index),
+            LPARAM(buf.as_mut_ptr() as isize),
+        );
+        buf
+    };
+
+    let lang = Language::CreateLanguage(&HSTRING::from_wide(&lang_tag[..lang_tag.len() - 1])?)?;
+
+    let engine = OcrEngine::TryCreateFromLanguage(&lang)?;
     let mut cur = Cursor::new(buf);
     engine
         .RecognizeAsync(&bmp)?
