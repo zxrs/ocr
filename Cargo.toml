@@ -1,6 +1,6 @@
 [package]
 name = "ocr"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 
 [dependencies]
@@ -13,6 +13,7 @@ features = [
     "Graphics_Imaging",
     "Foundation",
     "Foundation_Collections",
+    "Globalization",
     "Media_Ocr",
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
@@ -24,6 +25,9 @@ features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_UI_Controls",
 ]
+
+[profile.dev]
+debug = 0
 
 [profile.release]
 lto = "fat"
