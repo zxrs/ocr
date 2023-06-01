@@ -1,10 +1,11 @@
 #![windows_subsystem = "windows"]
 
-use anyhow::Result;
-use std::slice;
+use anyhow::{Context, Result};
+use once_cell::sync::OnceCell;
+use std::{collections::HashMap, slice};
 use utf16_lit::utf16_null;
 use windows::{
-    core::PCWSTR,
+    core::{HSTRING, PCWSTR},
     w,
     Media::Ocr::OcrEngine,
     Win32::{
@@ -30,6 +31,8 @@ use windows::{
 const ID_EDIT: i32 = 5456;
 const ID_COMBO: i32 = 5457;
 const BUF_SIZE: usize = 8192;
+
+static DISPLAY_NAMES: OnceCell<HashMap<Vec<u16>, Vec<u16>>> = OnceCell::new();
 
 mod clipboard;
 mod ocr;
@@ -79,8 +82,8 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
                 | WS_CHILD
                 | WS_VISIBLE
                 | WS_VSCROLL,
-            2,
-            2,
+            1,
+            1,
             120,
             200,
             hwnd,
@@ -92,15 +95,45 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
     let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
     let lang = engine.RecognizerLanguage()?;
 
-    OcrEngine::AvailableRecognizerLanguages()?
-        .First()?
-        .filter_map(|lang| lang.LanguageTag().ok())
-        .for_each(|hstr| unsafe {
+    //dbg!(lang.DisplayName()?.as_wide().to_vec());
+
+    DISPLAY_NAMES.get_or_init(|| {
+        OcrEngine::AvailableRecognizerLanguages()
+            .unwrap()
+            .First()
+            .unwrap()
+            .filter_map(|lang| {
+                Some((
+                    lang.DisplayName()
+                        .ok()?
+                        .as_wide()
+                        .iter()
+                        .chain(Some(&0))
+                        .copied()
+                        .collect(),
+                    lang.LanguageTag()
+                        .ok()?
+                        .as_wide()
+                        .iter()
+                        .chain(Some(&0))
+                        .copied()
+                        .collect(),
+                ))
+            })
+            .collect()
+    });
+
+    DISPLAY_NAMES
+        .get()
+        .context("no display names.")?
+        .keys()
+        .filter_map(|k| HSTRING::from_wide(k).ok())
+        .for_each(|h| unsafe {
             SendMessageW(
                 hwnd,
                 CB_ADDSTRING,
                 WPARAM::default(),
-                LPARAM(hstr.as_ptr() as isize),
+                LPARAM(h.as_ptr() as isize),
             );
         });
 
@@ -109,7 +142,7 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
             hwnd,
             CB_SELECTSTRING,
             WPARAM::default(),
-            LPARAM(lang.LanguageTag()?.as_ptr() as isize),
+            LPARAM(lang.DisplayName()?.as_ptr() as isize),
         )
     };
 
