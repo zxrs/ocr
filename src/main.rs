@@ -18,11 +18,12 @@ use windows::{
                 CreateWindowExW, DefWindowProcW, DispatchMessageW, EnumWindows, GetClientRect,
                 GetDlgItem, GetMessageW, GetWindowTextLengthW, GetWindowTextW, IsIconic,
                 PostQuitMessage, RegisterClassW, SendMessageW, SetForegroundWindow, ShowWindow,
-                TranslateMessage, CBS_DROPDOWNLIST, CBS_HASSTRINGS, CB_ADDSTRING, CB_SELECTSTRING,
-                CW_USEDEFAULT, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, HMENU,
-                MSG, SW_SHOW, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLIPBOARDUPDATE, WM_CREATE,
-                WM_DESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD, WS_EX_STATICEDGE, WS_HSCROLL,
-                WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_VISIBLE, WS_VSCROLL,
+                TranslateMessage, CBS_DROPDOWNLIST, CBS_HASSTRINGS, CBS_SORT, CB_ADDSTRING,
+                CB_SELECTSTRING, CW_USEDEFAULT, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE,
+                ES_WANTRETURN, HMENU, MSG, SW_SHOW, WINDOW_EX_STYLE, WINDOW_STYLE,
+                WM_CLIPBOARDUPDATE, WM_CREATE, WM_DESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD,
+                WS_EX_STATICEDGE, WS_HSCROLL, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU,
+                WS_VISIBLE, WS_VSCROLL,
             },
         },
     },
@@ -78,7 +79,7 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
             WS_EX_STATICEDGE,
             WC_COMBOBOXW,
             w!(""),
-            WINDOW_STYLE((CBS_DROPDOWNLIST | CBS_HASSTRINGS) as u32)
+            WINDOW_STYLE((CBS_DROPDOWNLIST | CBS_HASSTRINGS | CBS_SORT) as u32)
                 | WS_CHILD
                 | WS_VISIBLE
                 | WS_VSCROLL,
