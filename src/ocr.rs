@@ -1,5 +1,5 @@
-use super::{BUF_SIZE, ID_COMBO};
-use anyhow::Result;
+use super::{BUF_SIZE, DISPLAY_NAMES, ID_COMBO};
+use anyhow::{Context, Result};
 use std::io::{Cursor, Write};
 use std::ptr;
 use std::slice;
@@ -35,7 +35,7 @@ pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) 
 
     //let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
 
-    let lang_tag = unsafe {
+    let display_name = unsafe {
         let hctrl = GetDlgItem(hwnd, ID_COMBO);
         let index =
             SendMessageW(hctrl, CB_GETCURSEL, WPARAM::default(), LPARAM::default()).0 as usize;
@@ -51,6 +51,12 @@ pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) 
         );
         buf
     };
+
+    let lang_tag = DISPLAY_NAMES
+        .get()
+        .context("no display names.")?
+        .get(&display_name)
+        .context("no lang tag.")?;
 
     let lang = Language::CreateLanguage(&HSTRING::from_wide(&lang_tag[..lang_tag.len() - 1])?)?;
 
