@@ -54,9 +54,9 @@ pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) 
 
     let lang_tag = DISPLAY_NAMES
         .get()
-        .context("no display names.")?
+        .context(c!())?
         .get(&display_name)
-        .context("no lang tag.")?;
+        .context(c!())?;
 
     let lang = Language::CreateLanguage(&HSTRING::from_wide(&lang_tag[..lang_tag.len() - 1])?)?;
 

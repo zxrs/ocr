@@ -29,6 +29,13 @@ use windows::{
     },
 };
 
+#[rustfmt::skip]
+macro_rules! c {
+    () => {
+        concat!("[", file!(), ", line: ", line!(), ", column: ", column!(), "]")
+    };
+}
+
 const ID_EDIT: i32 = 5456;
 const ID_COMBO: i32 = 5457;
 const BUF_SIZE: usize = 8192;
@@ -126,7 +133,7 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
 
     DISPLAY_NAMES
         .get()
-        .context("no display names.")?
+        .context(c!())?
         .keys()
         .filter_map(|k| HSTRING::from_wide(k).ok())
         .for_each(|h| unsafe {
