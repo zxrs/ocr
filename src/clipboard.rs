@@ -2,14 +2,14 @@ use anyhow::{anyhow, ensure, Result};
 use std::ptr;
 use std::slice;
 use windows::Win32::{
-    Foundation::{HANDLE, HGLOBAL},
+    Foundation::{GlobalFree, HANDLE, HGLOBAL},
     Graphics::Gdi::BITMAPINFO,
     System::{
         DataExchange::{
             CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
             OpenClipboard, SetClipboardData,
         },
-        Memory::{GlobalAlloc, GlobalFree, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
+        Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
         Ole::{CF_DIB, CF_UNICODETEXT},
     },
 };
@@ -17,7 +17,7 @@ use windows::Win32::{
 struct Clipboard;
 impl Drop for Clipboard {
     fn drop(&mut self) {
-        unsafe { CloseClipboard() };
+        let _ = unsafe { CloseClipboard() };
     }
 }
 
@@ -25,7 +25,7 @@ impl Drop for Clipboard {
 struct Handle(HGLOBAL);
 impl Drop for Handle {
     fn drop(&mut self) {
-        unsafe { GlobalUnlock(self.0) };
+        let _ = unsafe { GlobalUnlock(self.0) };
     }
 }
 
@@ -128,10 +128,10 @@ pub fn get() -> Result<(i32, i32, Vec<u8>)> {
 }
 
 pub fn set(src: &[u16]) -> Result<()> {
-    unsafe { OpenClipboard(None).ok()? };
+    unsafe { OpenClipboard(None)? };
     let _clip = Clipboard;
 
-    unsafe { EmptyClipboard().ok()? };
+    unsafe { EmptyClipboard()? };
 
     let h_mem = unsafe { GlobalAlloc(GMEM_MOVEABLE, src.len() * 2)? };
     ensure!(!h_mem.is_invalid(), "failed to global alloc.");
@@ -142,22 +142,22 @@ pub fn set(src: &[u16]) -> Result<()> {
 
     unsafe {
         ptr::copy_nonoverlapping(src.as_ptr() as *const u8, dst, src.len() * 2);
-        GlobalUnlock(h_mem.0);
-        SetClipboardData(CF_UNICODETEXT.0 as u32, HANDLE(h_mem.0 .0))?;
+        let _ = GlobalUnlock(h_mem.0);
+        SetClipboardData(CF_UNICODETEXT.0 as u32, HANDLE(h_mem.0 .0 as _))?;
     }
     Ok(())
 }
 
 fn is_bitmap_on_clipboard() -> bool {
-    unsafe { IsClipboardFormatAvailable(CF_DIB.0 as u32).as_bool() }
+    unsafe { IsClipboardFormatAvailable(CF_DIB.0 as u32).is_ok() }
 }
 
 fn read_bitmap_from_clipboard() -> Result<Dib> {
-    unsafe { OpenClipboard(None).ok()? };
+    unsafe { OpenClipboard(None)? };
     let _clip = Clipboard;
 
     let handle = unsafe { GetClipboardData(CF_DIB.0 as u32)? };
-    let handle = HGLOBAL(handle.0);
+    let handle = HGLOBAL(handle.0 as _);
     let bitmap = unsafe { GlobalLock(handle) };
     ensure!(!bitmap.is_null(), "failed to global lock.");
     let _handle = Handle(handle);
