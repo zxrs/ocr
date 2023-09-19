@@ -5,8 +5,7 @@ use once_cell::sync::OnceCell;
 use std::{collections::HashMap, slice};
 use utf16_lit::utf16_null;
 use windows::{
-    core::{HSTRING, PCWSTR},
-    w,
+    core::{w, HSTRING, PCWSTR},
     Media::Ocr::OcrEngine,
     Win32::{
         Foundation::{BOOL, HMODULE, HWND, LPARAM, LRESULT, RECT, WPARAM},
@@ -159,7 +158,7 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
 
 fn create(hwnd: HWND) {
     let mut rc = RECT::default();
-    unsafe { GetClientRect(hwnd, &mut rc) };
+    let _ = unsafe { GetClientRect(hwnd, &mut rc) };
 
     unsafe {
         CreateWindowExW(
@@ -184,7 +183,7 @@ fn create(hwnd: HWND) {
         )
     };
     create_combobox(hwnd).ok();
-    unsafe { AddClipboardFormatListener(hwnd) };
+    let _ = unsafe { AddClipboardFormatListener(hwnd) };
 }
 
 fn ocr(hwnd: HWND) -> Result<()> {
@@ -216,7 +215,7 @@ fn ocr(hwnd: HWND) -> Result<()> {
 
 fn destroy(hwnd: HWND) {
     unsafe {
-        RemoveClipboardFormatListener(hwnd);
+        let _ = RemoveClipboardFormatListener(hwnd);
         PostQuitMessage(0);
     }
 }
@@ -237,11 +236,11 @@ unsafe extern "system" fn enum_win(hwnd: HWND, lparam: LPARAM) -> BOOL {
 }
 
 fn is_already_running() -> bool {
-    unsafe { !EnumWindows(Some(enum_win), LPARAM::default()).as_bool() }
+    unsafe { !EnumWindows(Some(enum_win), LPARAM::default()).is_ok() }
 }
 
 fn set_focus_existing_window() {
-    unsafe { EnumWindows(Some(enum_win), LPARAM(1)) };
+    let _ = unsafe { EnumWindows(Some(enum_win), LPARAM(1)) };
 }
 
 fn main() -> Result<()> {
