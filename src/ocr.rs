@@ -4,7 +4,7 @@ use std::io::{Cursor, Write};
 use std::ptr;
 use std::slice;
 use windows::{
-    core::{ComInterface, HSTRING},
+    core::{Interface, HSTRING},
     Globalization::Language,
     Graphics::Imaging::{BitmapBufferAccessMode, BitmapPixelFormat, SoftwareBitmap},
     Media::Ocr::OcrEngine,

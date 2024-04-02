@@ -1,28 +1,34 @@
-#![windows_subsystem = "windows"]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use anyhow::{Context, Result};
 use once_cell::sync::OnceCell;
 use std::{collections::HashMap, slice};
 use utf16_lit::utf16_null;
 use windows::{
-    core::{w, HSTRING, PCWSTR},
+    core::{h, w, HSTRING, PCWSTR},
     Media::Ocr::OcrEngine,
     Win32::{
-        Foundation::{BOOL, HMODULE, HWND, LPARAM, LRESULT, RECT, WPARAM},
+        Foundation::{BOOL, HWND, LPARAM, LRESULT, RECT, WPARAM},
         Graphics::Gdi::{GetSysColorBrush, COLOR_MENUBAR},
-        System::DataExchange::{AddClipboardFormatListener, RemoveClipboardFormatListener},
+        System::{
+            DataExchange::{AddClipboardFormatListener, RemoveClipboardFormatListener},
+            LibraryLoader::{GetModuleHandleW, LoadLibraryW},
+        },
         UI::{
-            Controls::{EM_REPLACESEL, EM_SETSEL, WC_COMBOBOXW},
+            Controls::{
+                RichEdit::{EM_GETTEXTLENGTHEX, GETTEXTLENGTHEX, GTL_DEFAULT, MSFTEDIT_CLASS},
+                EM_REPLACESEL, EM_SETSEL, WC_COMBOBOXW,
+            },
             WindowsAndMessaging::{
                 CreateWindowExW, DefWindowProcW, DispatchMessageW, EnumWindows, GetClientRect,
-                GetDlgItem, GetMessageW, GetWindowTextLengthW, GetWindowTextW, IsIconic,
-                PostQuitMessage, RegisterClassW, SendMessageW, SetForegroundWindow, ShowWindow,
-                TranslateMessage, CBS_DROPDOWNLIST, CBS_HASSTRINGS, CBS_SORT, CB_ADDSTRING,
-                CB_SELECTSTRING, CW_USEDEFAULT, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE,
-                ES_WANTRETURN, HMENU, MSG, SW_SHOW, WINDOW_EX_STYLE, WINDOW_STYLE,
-                WM_CLIPBOARDUPDATE, WM_CREATE, WM_DESTROY, WNDCLASSW, WS_CAPTION, WS_CHILD,
-                WS_EX_STATICEDGE, WS_HSCROLL, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU,
-                WS_VISIBLE, WS_VSCROLL,
+                GetMessageW, GetWindowTextW, IsIconic, PostQuitMessage, RegisterClassW,
+                SendMessageW, SetForegroundWindow, ShowWindow, TranslateMessage, CBS_DROPDOWNLIST,
+                CBS_HASSTRINGS, CBS_SORT, CB_ADDSTRING, CB_SELECTSTRING, CW_USEDEFAULT,
+                ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, HMENU, MSG, SB_BOTTOM,
+                SW_SHOW, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLIPBOARDUPDATE, WM_CREATE, WM_DESTROY,
+                WM_VSCROLL, WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_STATICEDGE,
+                WS_HSCROLL, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
+                WS_VSCROLL,
             },
         },
     },
@@ -35,11 +41,11 @@ macro_rules! c {
     };
 }
 
-const ID_EDIT: i32 = 5456;
 const ID_COMBO: i32 = 5457;
 const BUF_SIZE: usize = 8192;
 
 static DISPLAY_NAMES: OnceCell<HashMap<Vec<u16>, Vec<u16>>> = OnceCell::new();
+static HWND_RICH_EDIT: OnceCell<HWND> = OnceCell::new();
 
 mod clipboard;
 mod ocr;
@@ -95,7 +101,7 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
             200,
             hwnd,
             HMENU(ID_COMBO as isize),
-            HMODULE::default(),
+            None,
             None,
         )
     };
@@ -136,19 +142,14 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
         .keys()
         .filter_map(|k| HSTRING::from_wide(k).ok())
         .for_each(|h| unsafe {
-            SendMessageW(
-                hwnd,
-                CB_ADDSTRING,
-                WPARAM::default(),
-                LPARAM(h.as_ptr() as isize),
-            );
+            SendMessageW(hwnd, CB_ADDSTRING, None, LPARAM(h.as_ptr() as isize));
         });
 
     unsafe {
         SendMessageW(
             hwnd,
             CB_SELECTSTRING,
-            WPARAM::default(),
+            None,
             LPARAM(lang.DisplayName()?.as_ptr() as isize),
         )
     };
@@ -156,20 +157,22 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
     Ok(())
 }
 
-fn create(hwnd: HWND) {
-    let mut rc = RECT::default();
-    let _ = unsafe { GetClientRect(hwnd, &mut rc) };
+fn create_richedit(hwnd: HWND) -> Result<()> {
+    unsafe { LoadLibraryW(h!("Msftedit.dll"))? };
 
-    unsafe {
+    let mut rc = RECT::default();
+    unsafe { GetClientRect(hwnd, &mut rc)? };
+
+    let hwnd = unsafe {
         CreateWindowExW(
             WINDOW_EX_STYLE::default(),
-            w!("EDIT"),
+            MSFTEDIT_CLASS,
             None,
-            WS_CHILD
+            WINDOW_STYLE((ES_MULTILINE | ES_WANTRETURN | ES_AUTOHSCROLL | ES_AUTOVSCROLL) as _)
                 | WS_VISIBLE
-                | WINDOW_STYLE(
-                    (ES_WANTRETURN | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL) as u32,
-                )
+                | WS_CHILD
+                | WS_BORDER
+                | WS_TABSTOP
                 | WS_VSCROLL
                 | WS_HSCROLL,
             0,
@@ -177,13 +180,21 @@ fn create(hwnd: HWND) {
             rc.right,
             rc.bottom - 30,
             hwnd,
-            HMENU(ID_EDIT as isize),
-            HMODULE::default(),
+            None,
+            GetModuleHandleW(None)?,
             None,
         )
     };
+
+    HWND_RICH_EDIT.get_or_init(|| hwnd);
+
+    Ok(())
+}
+
+fn create(hwnd: HWND) {
+    create_richedit(hwnd).ok();
     create_combobox(hwnd).ok();
-    let _ = unsafe { AddClipboardFormatListener(hwnd) };
+    unsafe { AddClipboardFormatListener(hwnd).ok() };
 }
 
 fn ocr(hwnd: HWND) -> Result<()> {
@@ -195,10 +206,22 @@ fn ocr(hwnd: HWND) -> Result<()> {
     let txt = unsafe { slice::from_raw_parts(buf.as_ptr() as *const u16, len / 2) };
     clipboard::set(txt)?;
 
-    let hedit = unsafe { GetDlgItem(hwnd, ID_EDIT) };
+    let hedit = HWND_RICH_EDIT.get().copied().context("no hwnd.")?;
 
     // move the caret to the end of the text
-    let len = unsafe { GetWindowTextLengthW(hedit) as usize };
+    let len = GETTEXTLENGTHEX {
+        flags: GTL_DEFAULT,
+        codepage: 1200,
+    };
+    let len = unsafe {
+        SendMessageW(
+            hedit,
+            EM_GETTEXTLENGTHEX,
+            WPARAM(&len as *const _ as _),
+            None,
+        )
+        .0 as usize
+    };
     unsafe { SendMessageW(hedit, EM_SETSEL, WPARAM(len), LPARAM(len as isize)) };
 
     // insert the text at the new caret position
@@ -210,6 +233,9 @@ fn ocr(hwnd: HWND) -> Result<()> {
             LPARAM(txt.as_ptr() as isize),
         )
     };
+
+    // scroll to the end of richedit
+    unsafe { SendMessageW(hedit, WM_VSCROLL, WPARAM(SB_BOTTOM.0 as _), None) };
     Ok(())
 }
 
@@ -236,7 +262,7 @@ unsafe extern "system" fn enum_win(hwnd: HWND, lparam: LPARAM) -> BOOL {
 }
 
 fn is_already_running() -> bool {
-    unsafe { !EnumWindows(Some(enum_win), LPARAM::default()).is_ok() }
+    unsafe { !EnumWindows(Some(enum_win), None).is_ok() }
 }
 
 fn set_focus_existing_window() {
@@ -268,9 +294,9 @@ fn main() -> Result<()> {
             CW_USEDEFAULT,
             600,
             480,
-            HWND::default(),
-            HMENU::default(),
-            HMODULE::default(),
+            None,
+            None,
+            None,
             None,
         )
     };
@@ -280,7 +306,7 @@ fn main() -> Result<()> {
     let mut msg = MSG::default();
 
     loop {
-        if !unsafe { GetMessageW(&mut msg, HWND::default(), 0, 0) }.as_bool() {
+        if !unsafe { GetMessageW(&mut msg, None, 0, 0) }.as_bool() {
             break;
         }
         unsafe {
