@@ -252,9 +252,9 @@ unsafe extern "system" fn enum_win(hwnd: HWND, lparam: LPARAM) -> BOOL {
     if buf.starts_with(TITLE) {
         if lparam.0 > 0 {
             if IsIconic(hwnd).as_bool() {
-                ShowWindow(hwnd, SW_SHOW);
+                let _ = ShowWindow(hwnd, SW_SHOW);
             }
-            SetForegroundWindow(hwnd);
+            let _ = SetForegroundWindow(hwnd);
         }
         return false.into();
     }
@@ -262,7 +262,7 @@ unsafe extern "system" fn enum_win(hwnd: HWND, lparam: LPARAM) -> BOOL {
 }
 
 fn is_already_running() -> bool {
-    unsafe { !EnumWindows(Some(enum_win), None).is_ok() }
+    unsafe { EnumWindows(Some(enum_win), None).is_err() }
 }
 
 fn set_focus_existing_window() {
@@ -301,7 +301,7 @@ fn main() -> Result<()> {
         )
     };
 
-    unsafe { ShowWindow(hwnd, SW_SHOW) };
+    let _ = unsafe { ShowWindow(hwnd, SW_SHOW) };
 
     let mut msg = MSG::default();
 
@@ -310,7 +310,7 @@ fn main() -> Result<()> {
             break;
         }
         unsafe {
-            TranslateMessage(&msg);
+            let _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
     }
