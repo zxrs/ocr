@@ -163,8 +163,16 @@ fn read_bitmap_from_clipboard() -> Result<Dib> {
     let _handle = Handle(handle);
 
     let bitmap = unsafe { &mut *(bitmap as *mut BITMAPINFO) };
-    let size = bitmap.bmiHeader.biSizeImage as usize;
-    ensure!(size > 0, "no data.");
+    //dbg!(&bitmap);
+
+    let width = bitmap.bmiHeader.biWidth;
+    let height = bitmap.bmiHeader.biHeight;
+    let size = if bitmap.bmiHeader.biSizeImage == 0 {
+        (width * height * bitmap.bmiHeader.biBitCount as i32 / 8) as _
+    } else {
+        bitmap.bmiHeader.biSizeImage as _
+    };
+    //ensure!(size > 0, "no data.");
 
     let bits_per_pixel = bitmap.bmiHeader.biBitCount;
     ensure!(bitmap.bmiHeader.biHeight > 0, "not yet supported!");
@@ -172,8 +180,8 @@ fn read_bitmap_from_clipboard() -> Result<Dib> {
     let data = unsafe { slice::from_raw_parts(bitmap.bmiColors.as_ptr() as *mut u8, size) };
 
     Ok(Dib {
-        width: bitmap.bmiHeader.biWidth,
-        height: bitmap.bmiHeader.biHeight,
+        width,
+        height,
         bits_per_pixel,
         data: data.to_owned(),
     })
