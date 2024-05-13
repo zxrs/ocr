@@ -17,7 +17,7 @@ use windows::Win32::{
 struct Clipboard;
 impl Drop for Clipboard {
     fn drop(&mut self) {
-        let _ = unsafe { CloseClipboard() };
+        unsafe { CloseClipboard().ok() };
     }
 }
 
@@ -25,7 +25,7 @@ impl Drop for Clipboard {
 struct Handle(HGLOBAL);
 impl Drop for Handle {
     fn drop(&mut self) {
-        let _ = unsafe { GlobalUnlock(self.0) };
+        unsafe { GlobalUnlock(self.0).ok() };
     }
 }
 
