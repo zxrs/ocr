@@ -301,16 +301,15 @@ fn main() -> Result<()> {
         )
     };
 
-    let _ = unsafe { ShowWindow(hwnd, SW_SHOW) };
+    unsafe { ShowWindow(hwnd, SW_SHOW).ok()? };
 
     let mut msg = MSG::default();
-
     loop {
         if !unsafe { GetMessageW(&mut msg, None, 0, 0) }.as_bool() {
             break;
         }
         unsafe {
-            let _ = TranslateMessage(&msg);
+            TranslateMessage(&msg).ok()?;
             DispatchMessageW(&msg);
         }
     }

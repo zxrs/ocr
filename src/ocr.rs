@@ -85,12 +85,12 @@ pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) 
                             && ((*r)[pos - 4..pos] != [0x0d, 0x00, 0x0a, 0x00]
                                 && (*r)[pos - 2..pos] != [0x20, 0x00])
                         {
-                            let _ = cur.write(&[0x20, 0x00])?;
+                            cur.write(&[0x20, 0x00])?;
                         }
-                        let _ = cur.write(data)?;
-                        let _ = cur.write(&[0x20, 0x00])?;
+                        cur.write(data)?;
+                        cur.write(&[0x20, 0x00])?;
                     } else {
-                        let _ = cur.write(data)?;
+                        cur.write(data)?;
                     }
                     Ok(())
                 })?;
@@ -101,16 +101,16 @@ pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) 
                 cur.set_position(pos as u64 - 2);
             }
             // add "\r\n"
-            let _ = cur.write(&[0x0d, 0x00, 0x0a, 0x00])?;
+            cur.write(&[0x0d, 0x00, 0x0a, 0x00])?;
             Ok(())
         })?;
     // null termination.
-    let _ = cur.write(&[0, 0])?;
+    cur.write(&[0, 0])?;
 
     // the last 2 bytes of buffer should be null terminatation.
     if cur.position() as usize > BUF_SIZE - 2 {
         cur.set_position((BUF_SIZE - 2) as u64);
-        let _ = cur.write(&[0, 0])?;
+        cur.write(&[0, 0])?;
     }
 
     Ok(cur.position() as usize)
