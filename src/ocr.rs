@@ -36,7 +36,7 @@ pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) 
     //let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
 
     let display_name = unsafe {
-        let hctrl = GetDlgItem(hwnd, ID_COMBO);
+        let hctrl = GetDlgItem(hwnd, ID_COMBO)?;
         let index =
             SendMessageW(hctrl, CB_GETCURSEL, WPARAM::default(), LPARAM::default()).0 as usize;
         //dbg!(index);
@@ -85,12 +85,12 @@ pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) 
                             && ((*r)[pos - 4..pos] != [0x0d, 0x00, 0x0a, 0x00]
                                 && (*r)[pos - 2..pos] != [0x20, 0x00])
                         {
-                            cur.write(&[0x20, 0x00])?;
+                            cur.write_all(&[0x20, 0x00])?;
                         }
-                        cur.write(data)?;
-                        cur.write(&[0x20, 0x00])?;
+                        cur.write_all(data)?;
+                        cur.write_all(&[0x20, 0x00])?;
                     } else {
-                        cur.write(data)?;
+                        cur.write_all(data)?;
                     }
                     Ok(())
                 })?;
@@ -101,16 +101,16 @@ pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) 
                 cur.set_position(pos as u64 - 2);
             }
             // add "\r\n"
-            cur.write(&[0x0d, 0x00, 0x0a, 0x00])?;
+            cur.write_all(&[0x0d, 0x00, 0x0a, 0x00])?;
             Ok(())
         })?;
     // null termination.
-    cur.write(&[0, 0])?;
+    cur.write_all(&[0, 0])?;
 
     // the last 2 bytes of buffer should be null terminatation.
     if cur.position() as usize > BUF_SIZE - 2 {
         cur.set_position((BUF_SIZE - 2) as u64);
-        cur.write(&[0, 0])?;
+        cur.write_all(&[0, 0])?;
     }
 
     Ok(cur.position() as usize)

@@ -45,7 +45,22 @@ const ID_COMBO: i32 = 5457;
 const BUF_SIZE: usize = 8192;
 
 static DISPLAY_NAMES: OnceCell<HashMap<Vec<u16>, Vec<u16>>> = OnceCell::new();
-static HWND_RICH_EDIT: OnceCell<HWND> = OnceCell::new();
+static HWND_RICH_EDIT: OnceCell<Hwnd> = OnceCell::new();
+
+struct Hwnd(HWND);
+
+unsafe impl Send for Hwnd {}
+unsafe impl Sync for Hwnd {}
+
+impl Hwnd {
+    fn new(hwnd: HWND) -> Self {
+        Self(hwnd)
+    }
+
+    fn handle(&self) -> HWND {
+        self.0
+    }
+}
 
 mod clipboard;
 mod ocr;
@@ -100,10 +115,10 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
             120,
             200,
             hwnd,
-            HMENU(ID_COMBO as isize),
+            HMENU(ID_COMBO as _),
             None,
             None,
-        )
+        )?
     };
     let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
     let lang = engine.RecognizerLanguage()?;
@@ -183,10 +198,10 @@ fn create_richedit(hwnd: HWND) -> Result<()> {
             None,
             GetModuleHandleW(None)?,
             None,
-        )
+        )?
     };
 
-    HWND_RICH_EDIT.get_or_init(|| hwnd);
+    HWND_RICH_EDIT.get_or_init(|| Hwnd::new(hwnd));
 
     Ok(())
 }
@@ -206,7 +221,7 @@ fn ocr(hwnd: HWND) -> Result<()> {
     let txt = unsafe { slice::from_raw_parts(buf.as_ptr() as *const u16, len / 2) };
     clipboard::set(txt)?;
 
-    let hedit = HWND_RICH_EDIT.get().copied().context("no hwnd.")?;
+    let hedit = HWND_RICH_EDIT.get().context("no hedit.")?.handle();
 
     // move the caret to the end of the text
     let len = GETTEXTLENGTHEX {
@@ -241,7 +256,7 @@ fn ocr(hwnd: HWND) -> Result<()> {
 
 fn destroy(hwnd: HWND) {
     unsafe {
-        let _ = RemoveClipboardFormatListener(hwnd);
+        _ = RemoveClipboardFormatListener(hwnd);
         PostQuitMessage(0);
     }
 }
@@ -252,9 +267,9 @@ unsafe extern "system" fn enum_win(hwnd: HWND, lparam: LPARAM) -> BOOL {
     if buf.starts_with(TITLE) {
         if lparam.0 > 0 {
             if IsIconic(hwnd).as_bool() {
-                let _ = ShowWindow(hwnd, SW_SHOW);
+                _ = ShowWindow(hwnd, SW_SHOW);
             }
-            let _ = SetForegroundWindow(hwnd);
+            _ = SetForegroundWindow(hwnd);
         }
         return false.into();
     }
@@ -266,7 +281,7 @@ fn is_already_running() -> bool {
 }
 
 fn set_focus_existing_window() {
-    let _ = unsafe { EnumWindows(Some(enum_win), LPARAM(1)) };
+    _ = unsafe { EnumWindows(Some(enum_win), LPARAM(1)) };
 }
 
 fn main() -> Result<()> {
@@ -298,7 +313,7 @@ fn main() -> Result<()> {
             None,
             None,
             None,
-        )
+        )?
     };
 
     unsafe { ShowWindow(hwnd, SW_SHOW).ok()? };
@@ -309,7 +324,7 @@ fn main() -> Result<()> {
             break;
         }
         unsafe {
-            TranslateMessage(&msg).ok()?;
+            _ = TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
     }
