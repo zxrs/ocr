@@ -1,34 +1,38 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use anyhow::{Context, Result};
-use once_cell::sync::OnceCell;
+use std::sync::OnceLock;
 use std::{collections::HashMap, slice};
 use utf16_lit::utf16_null;
 use windows::{
     core::{h, w, HSTRING, PCWSTR},
     Media::Ocr::OcrEngine,
     Win32::{
-        Foundation::{BOOL, HWND, LPARAM, LRESULT, RECT, WPARAM},
-        Graphics::Gdi::{GetSysColorBrush, COLOR_MENUBAR},
+        Foundation::{BOOL, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
+        Graphics::Gdi::{ClientToScreen, GetSysColorBrush, COLOR_MENUBAR},
         System::{
             DataExchange::{AddClipboardFormatListener, RemoveClipboardFormatListener},
             LibraryLoader::{GetModuleHandleW, LoadLibraryW},
         },
         UI::{
             Controls::{
-                RichEdit::{EM_GETTEXTLENGTHEX, GETTEXTLENGTHEX, GTL_DEFAULT, MSFTEDIT_CLASS},
-                EM_REPLACESEL, EM_SETSEL, WC_COMBOBOXW,
+                RichEdit::{
+                    EM_GETEVENTMASK, EM_GETTEXTLENGTHEX, EM_SETEVENTMASK, ENM_MOUSEEVENTS,
+                    EN_MSGFILTER, GETTEXTLENGTHEX, GTL_DEFAULT, MSFTEDIT_CLASS, MSGFILTER,
+                },
+                EM_REPLACESEL, EM_SETSEL, NMHDR, WC_COMBOBOXW,
             },
             WindowsAndMessaging::{
-                CreateWindowExW, DefWindowProcW, DispatchMessageW, EnumWindows, GetClientRect,
-                GetMessageW, GetWindowTextW, IsIconic, PostQuitMessage, RegisterClassW,
-                SendMessageW, SetForegroundWindow, ShowWindow, TranslateMessage, CBS_DROPDOWNLIST,
-                CBS_HASSTRINGS, CBS_SORT, CB_ADDSTRING, CB_SELECTSTRING, CW_USEDEFAULT,
-                ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, HMENU, MSG, SB_BOTTOM,
-                SW_SHOW, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLIPBOARDUPDATE, WM_CREATE, WM_DESTROY,
-                WM_VSCROLL, WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_STATICEDGE,
-                WS_HSCROLL, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE,
-                WS_VSCROLL,
+                AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
+                DispatchMessageW, EnumWindows, GetClientRect, GetMessageW, GetWindowTextW,
+                IsIconic, PostQuitMessage, RegisterClassW, SendMessageW, SetForegroundWindow,
+                ShowWindow, TrackPopupMenuEx, TranslateMessage, CBS_DROPDOWNLIST, CBS_HASSTRINGS,
+                CBS_SORT, CB_ADDSTRING, CB_SELECTSTRING, CW_USEDEFAULT, ES_AUTOHSCROLL,
+                ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, HMENU, MF_STRING, MSG, SB_BOTTOM,
+                SW_SHOW, TPM_LEFTALIGN, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLIPBOARDUPDATE,
+                WM_COMMAND, WM_COPY, WM_CREATE, WM_DESTROY, WM_NOTIFY, WM_RBUTTONDOWN, WM_VSCROLL,
+                WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_STATICEDGE, WS_HSCROLL,
+                WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
             },
         },
     },
@@ -43,9 +47,13 @@ macro_rules! c {
 
 const ID_COMBO: i32 = 5457;
 const BUF_SIZE: usize = 8192;
+const ID_COPY: usize = 1000;
 
-static DISPLAY_NAMES: OnceCell<HashMap<Vec<u16>, Vec<u16>>> = OnceCell::new();
-static HWND_RICH_EDIT: OnceCell<Hwnd> = OnceCell::new();
+const COPY_TEXT: PCWSTR = w!("Copy");
+
+static DISPLAY_NAMES: OnceLock<HashMap<Vec<u16>, Vec<u16>>> = OnceLock::new();
+static HWND_MAIN_WINDOW: OnceLock<Hwnd> = OnceLock::new();
+static HWND_RICH_EDIT: OnceLock<Hwnd> = OnceLock::new();
 
 struct Hwnd(HWND);
 
@@ -80,6 +88,30 @@ unsafe extern "system" fn wnd_proc(
 ) -> LRESULT {
     match msg {
         WM_CREATE => create(hwnd),
+        WM_NOTIFY => {
+            let header = &*(lparam.0 as *const NMHDR);
+            if header.code == EN_MSGFILTER {
+                let mf = &*(lparam.0 as *const MSGFILTER);
+                if mf.msg == WM_RBUTTONDOWN {
+                    let x = loword(mf.lParam.0 as _);
+                    let y = hiword(mf.lParam.0 as _);
+                    open_popup_menu(hwnd, x, y).ok();
+                }
+            }
+        }
+        WM_COMMAND => {
+            let id = loword(wparam.0 as u32) as usize;
+            if let Some(hedit) = HWND_RICH_EDIT.get() {
+                // Some ID_XXX will be added in the future...
+                #[allow(clippy::single_match)]
+                match id {
+                    ID_COPY => {
+                        SendMessageW(hedit.handle(), WM_COPY, None, None);
+                    }
+                    _ => (),
+                }
+            }
+        }
         WM_CLIPBOARDUPDATE => {
             // Adobe PDF reader:    WPARAM(0 | 3 | 5 | 6)
             // Firefox:             WPARAM(6 | 4)
@@ -201,6 +233,10 @@ fn create_richedit(hwnd: HWND) -> Result<()> {
         )?
     };
 
+    let result = unsafe { SendMessageW(hwnd, EM_GETEVENTMASK, None, None) };
+    let event = result.0 | ENM_MOUSEEVENTS as isize;
+    unsafe { SendMessageW(hwnd, EM_SETEVENTMASK, None, LPARAM(event)) };
+
     HWND_RICH_EDIT.get_or_init(|| Hwnd::new(hwnd));
 
     Ok(())
@@ -210,6 +246,22 @@ fn create(hwnd: HWND) {
     create_richedit(hwnd).ok();
     create_combobox(hwnd).ok();
     unsafe { AddClipboardFormatListener(hwnd).ok() };
+}
+
+fn open_popup_menu(hwnd: HWND, x: u16, y: u16) -> Result<()> {
+    let hmenu = unsafe { CreatePopupMenu()? };
+    unsafe { AppendMenuW(hmenu, MF_STRING, ID_COPY, COPY_TEXT)? };
+
+    let mut pt = POINT {
+        x: x as _,
+        y: y as _,
+    };
+    let hedit = HWND_RICH_EDIT.get().context("no hwnd.")?.handle();
+    unsafe { ClientToScreen(hedit, &mut pt).ok()? };
+
+    unsafe { TrackPopupMenuEx(hmenu, TPM_LEFTALIGN.0, pt.x, pt.y, hwnd, None).ok()? };
+    unsafe { DestroyMenu(hmenu)? };
+    Ok(())
 }
 
 fn ocr(hwnd: HWND) -> Result<()> {
@@ -316,6 +368,8 @@ fn main() -> Result<()> {
         )?
     };
 
+    HWND_MAIN_WINDOW.get_or_init(|| Hwnd::new(hwnd));
+
     unsafe { ShowWindow(hwnd, SW_SHOW).ok()? };
 
     let mut msg = MSG::default();
@@ -328,5 +382,15 @@ fn main() -> Result<()> {
             DispatchMessageW(&msg);
         }
     }
+
     Ok(())
+}
+
+// helper functions
+fn loword(dword: u32) -> u16 {
+    ((dword << 16) >> 16) as _
+}
+
+fn hiword(dword: u32) -> u16 {
+    (dword >> 16) as _
 }
