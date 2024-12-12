@@ -4,6 +4,14 @@ A tiny [OcrEngine](https://learn.microsoft.com/ja-jp/uwp/api/windows.media.ocr.o
 
 ![ocr](https://user-images.githubusercontent.com/60449021/208563347-15c88f52-f07f-4921-8a31-7d1386244702.png)
 
+## How to use
+
+```
+git clone https://github.com/zxrs/ocr.git
+cd ocr
+cargo run --release
+```
+
 ## How to install an OCR language pack
 
 The following commands on PowerShell install the OCR pack for "en-US":
