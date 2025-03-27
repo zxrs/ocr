@@ -36,18 +36,29 @@ pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) 
     //let engine = OcrEngine::TryCreateFromUserProfileLanguages()?;
 
     let display_name = unsafe {
-        let hctrl = GetDlgItem(hwnd, ID_COMBO)?;
-        let index =
-            SendMessageW(hctrl, CB_GETCURSEL, WPARAM::default(), LPARAM::default()).0 as usize;
+        let hctrl = GetDlgItem(Some(hwnd), ID_COMBO)?;
+        let index = SendMessageW(
+            hctrl,
+            CB_GETCURSEL,
+            Some(WPARAM::default()),
+            Some(LPARAM::default()),
+        )
+        .0 as usize;
         //dbg!(index);
-        let len = SendMessageW(hctrl, CB_GETLBTEXTLEN, WPARAM(index), LPARAM::default()).0 as usize;
+        let len = SendMessageW(
+            hctrl,
+            CB_GETLBTEXTLEN,
+            Some(WPARAM(index)),
+            Some(LPARAM::default()),
+        )
+        .0 as usize;
         //dbg!(len);
         let mut buf = vec![0u16; len + 1];
         SendMessageW(
             hctrl,
             CB_GETLBTEXT,
-            WPARAM(index),
-            LPARAM(buf.as_mut_ptr() as isize),
+            Some(WPARAM(index)),
+            Some(LPARAM(buf.as_mut_ptr() as isize)),
         );
         buf
     };
@@ -58,7 +69,7 @@ pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) 
         .get(&display_name)
         .context(c!())?;
 
-    let lang = Language::CreateLanguage(&HSTRING::from_wide(&lang_tag[..lang_tag.len() - 1])?)?;
+    let lang = Language::CreateLanguage(&HSTRING::from_wide(&lang_tag[..lang_tag.len() - 1]))?;
 
     let engine = OcrEngine::TryCreateFromLanguage(&lang)?;
     let mut cur = Cursor::new(buf);
@@ -69,7 +80,6 @@ pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) 
         .First()?
         .try_for_each(|line| -> Result<()> {
             line.Text()?
-                .as_wide()
                 // split by whitespace
                 .split(|num| num == &0x0020)
                 .try_for_each(|data| -> Result<()> {

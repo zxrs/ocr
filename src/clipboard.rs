@@ -1,16 +1,19 @@
 use anyhow::{anyhow, ensure, Result};
 use std::ptr;
 use std::slice;
-use windows::Win32::{
-    Foundation::{GlobalFree, HANDLE, HGLOBAL},
-    Graphics::Gdi::BITMAPINFO,
-    System::{
-        DataExchange::{
-            CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
-            OpenClipboard, SetClipboardData,
+use windows::{
+    core::Free,
+    Win32::{
+        Foundation::{HANDLE, HGLOBAL},
+        Graphics::Gdi::BITMAPINFO,
+        System::{
+            DataExchange::{
+                CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
+                OpenClipboard, SetClipboardData,
+            },
+            Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
+            Ole::{CF_DIB, CF_UNICODETEXT},
         },
-        Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
-        Ole::{CF_DIB, CF_UNICODETEXT},
     },
 };
 
@@ -25,7 +28,7 @@ impl Drop for Clipboard {
 struct Handle(HGLOBAL);
 impl Drop for Handle {
     fn drop(&mut self) {
-        unsafe { GlobalUnlock(self.0).ok() };
+        unsafe { self.0.free() };
     }
 }
 
@@ -33,7 +36,7 @@ impl Drop for Handle {
 struct MemoryHandle(HGLOBAL);
 impl Drop for MemoryHandle {
     fn drop(&mut self) {
-        unsafe { GlobalFree(self.0).ok() };
+        unsafe { self.0.free() };
     }
 }
 
@@ -143,7 +146,7 @@ pub fn set(src: &[u16]) -> Result<()> {
     unsafe {
         ptr::copy_nonoverlapping(src.as_ptr() as *const u8, dst, src.len() * 2);
         let _ = GlobalUnlock(h_mem.0);
-        SetClipboardData(CF_UNICODETEXT.0 as u32, HANDLE(h_mem.0 .0 as _))?;
+        SetClipboardData(CF_UNICODETEXT.0 as u32, Some(HANDLE(h_mem.0 .0 as _)))?;
     }
     Ok(())
 }

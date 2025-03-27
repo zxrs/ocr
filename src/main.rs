@@ -5,10 +5,10 @@ use std::sync::OnceLock;
 use std::{collections::HashMap, slice};
 use utf16_lit::utf16_null;
 use windows::{
-    core::{h, w, HSTRING, PCWSTR},
+    core::{h, w, BOOL, HSTRING, PCWSTR},
     Media::Ocr::OcrEngine,
     Win32::{
-        Foundation::{BOOL, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
+        Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
         Graphics::Gdi::{ClientToScreen, GetSysColorBrush, COLOR_MENUBAR},
         System::{
             DataExchange::{AddClipboardFormatListener, RemoveClipboardFormatListener},
@@ -146,8 +146,8 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
             1,
             120,
             200,
-            hwnd,
-            HMENU(ID_COMBO as _),
+            Some(hwnd),
+            Some(HMENU(ID_COMBO as _)),
             None,
             None,
         )?
@@ -166,14 +166,12 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
                 Some((
                     lang.DisplayName()
                         .ok()?
-                        .as_wide()
                         .iter()
                         .chain(Some(&0))
                         .copied()
                         .collect(),
                     lang.LanguageTag()
                         .ok()?
-                        .as_wide()
                         .iter()
                         .chain(Some(&0))
                         .copied()
@@ -187,9 +185,9 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
         .get()
         .context(c!())?
         .keys()
-        .filter_map(|k| HSTRING::from_wide(k).ok())
+        .map(|k| HSTRING::from_wide(k))
         .for_each(|h| unsafe {
-            SendMessageW(hwnd, CB_ADDSTRING, None, LPARAM(h.as_ptr() as isize));
+            SendMessageW(hwnd, CB_ADDSTRING, None, Some(LPARAM(h.as_ptr() as isize)));
         });
 
     unsafe {
@@ -197,7 +195,7 @@ fn create_combobox(hwnd: HWND) -> Result<()> {
             hwnd,
             CB_SELECTSTRING,
             None,
-            LPARAM(lang.DisplayName()?.as_ptr() as isize),
+            Some(LPARAM(lang.DisplayName()?.as_ptr() as isize)),
         )
     };
 
@@ -226,16 +224,16 @@ fn create_richedit(hwnd: HWND) -> Result<()> {
             30,
             rc.right,
             rc.bottom - 30,
-            hwnd,
+            Some(hwnd),
             None,
-            GetModuleHandleW(None)?,
+            GetModuleHandleW(None).ok().map(Into::into),
             None,
         )?
     };
 
     let result = unsafe { SendMessageW(hwnd, EM_GETEVENTMASK, None, None) };
     let event = result.0 | ENM_MOUSEEVENTS as isize;
-    unsafe { SendMessageW(hwnd, EM_SETEVENTMASK, None, LPARAM(event)) };
+    unsafe { SendMessageW(hwnd, EM_SETEVENTMASK, None, Some(LPARAM(event))) };
 
     HWND_RICH_EDIT.get_or_init(|| Hwnd::new(hwnd));
 
@@ -284,25 +282,32 @@ fn ocr(hwnd: HWND) -> Result<()> {
         SendMessageW(
             hedit,
             EM_GETTEXTLENGTHEX,
-            WPARAM(&len as *const _ as _),
+            Some(WPARAM(&len as *const _ as _)),
             None,
         )
         .0 as usize
     };
-    unsafe { SendMessageW(hedit, EM_SETSEL, WPARAM(len), LPARAM(len as isize)) };
+    unsafe {
+        SendMessageW(
+            hedit,
+            EM_SETSEL,
+            Some(WPARAM(len)),
+            Some(LPARAM(len as isize)),
+        )
+    };
 
     // insert the text at the new caret position
     unsafe {
         SendMessageW(
             hedit,
             EM_REPLACESEL,
-            WPARAM(1),
-            LPARAM(txt.as_ptr() as isize),
+            Some(WPARAM(1)),
+            Some(LPARAM(txt.as_ptr() as isize)),
         )
     };
 
     // scroll to the end of richedit
-    unsafe { SendMessageW(hedit, WM_VSCROLL, WPARAM(SB_BOTTOM.0 as _), None) };
+    unsafe { SendMessageW(hedit, WM_VSCROLL, Some(WPARAM(SB_BOTTOM.0 as _)), None) };
     Ok(())
 }
 
@@ -329,7 +334,7 @@ unsafe extern "system" fn enum_win(hwnd: HWND, lparam: LPARAM) -> BOOL {
 }
 
 fn is_already_running() -> bool {
-    unsafe { EnumWindows(Some(enum_win), None).is_err() }
+    unsafe { EnumWindows(Some(enum_win), LPARAM::default()).is_err() }
 }
 
 fn set_focus_existing_window() {
