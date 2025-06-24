@@ -5,37 +5,38 @@ use std::sync::OnceLock;
 use std::{collections::HashMap, slice};
 use utf16_lit::utf16_null;
 use windows::{
-    core::{h, w, BOOL, HSTRING, PCWSTR},
     Media::Ocr::OcrEngine,
     Win32::{
         Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
-        Graphics::Gdi::{ClientToScreen, GetSysColorBrush, COLOR_MENUBAR},
+        Graphics::Gdi::{COLOR_MENUBAR, ClientToScreen, GetSysColorBrush},
         System::{
             DataExchange::{AddClipboardFormatListener, RemoveClipboardFormatListener},
             LibraryLoader::{GetModuleHandleW, LoadLibraryW},
         },
         UI::{
             Controls::{
+                EM_REPLACESEL, EM_SETSEL, NMHDR,
                 RichEdit::{
-                    EM_GETEVENTMASK, EM_GETTEXTLENGTHEX, EM_SETEVENTMASK, ENM_MOUSEEVENTS,
-                    EN_MSGFILTER, GETTEXTLENGTHEX, GTL_DEFAULT, MSFTEDIT_CLASS, MSGFILTER,
+                    EM_GETEVENTMASK, EM_GETTEXTLENGTHEX, EM_SETEVENTMASK, EN_MSGFILTER,
+                    ENM_MOUSEEVENTS, GETTEXTLENGTHEX, GTL_DEFAULT, MSFTEDIT_CLASS, MSGFILTER,
                 },
-                EM_REPLACESEL, EM_SETSEL, NMHDR, WC_COMBOBOXW,
+                WC_COMBOBOXW,
             },
             WindowsAndMessaging::{
-                AppendMenuW, CreatePopupMenu, CreateWindowExW, DefWindowProcW, DestroyMenu,
-                DispatchMessageW, EnumWindows, GetClientRect, GetMessageW, GetWindowTextW,
-                IsIconic, PostQuitMessage, RegisterClassW, SendMessageW, SetForegroundWindow,
-                ShowWindow, TrackPopupMenuEx, TranslateMessage, CBS_DROPDOWNLIST, CBS_HASSTRINGS,
-                CBS_SORT, CB_ADDSTRING, CB_SELECTSTRING, CW_USEDEFAULT, ES_AUTOHSCROLL,
-                ES_AUTOVSCROLL, ES_MULTILINE, ES_WANTRETURN, HMENU, MF_STRING, MSG, SB_BOTTOM,
-                SW_SHOW, TPM_LEFTALIGN, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLIPBOARDUPDATE,
-                WM_COMMAND, WM_COPY, WM_CREATE, WM_DESTROY, WM_NOTIFY, WM_RBUTTONDOWN, WM_VSCROLL,
-                WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_STATICEDGE, WS_HSCROLL,
-                WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+                AppendMenuW, CB_ADDSTRING, CB_SELECTSTRING, CBS_DROPDOWNLIST, CBS_HASSTRINGS,
+                CBS_SORT, CW_USEDEFAULT, CreatePopupMenu, CreateWindowExW, DefWindowProcW,
+                DestroyMenu, DispatchMessageW, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE,
+                ES_WANTRETURN, EnumWindows, GetClientRect, GetMessageW, GetWindowTextW, HMENU,
+                IsIconic, MF_STRING, MSG, PostQuitMessage, RegisterClassW, SB_BOTTOM, SW_SHOW,
+                SendMessageW, SetForegroundWindow, ShowWindow, TPM_LEFTALIGN, TrackPopupMenuEx,
+                TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLIPBOARDUPDATE, WM_COMMAND,
+                WM_COPY, WM_CREATE, WM_DESTROY, WM_NOTIFY, WM_RBUTTONDOWN, WM_VSCROLL, WNDCLASSW,
+                WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_STATICEDGE, WS_HSCROLL, WS_MINIMIZEBOX,
+                WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
             },
         },
     },
+    core::{BOOL, HSTRING, PCWSTR, h, w},
 };
 
 #[rustfmt::skip]
@@ -89,9 +90,9 @@ unsafe extern "system" fn wnd_proc(
     match msg {
         WM_CREATE => create(hwnd),
         WM_NOTIFY => {
-            let header = &*(lparam.0 as *const NMHDR);
+            let header = unsafe { &*(lparam.0 as *const NMHDR) };
             if header.code == EN_MSGFILTER {
-                let mf = &*(lparam.0 as *const MSGFILTER);
+                let mf = unsafe { &*(lparam.0 as *const MSGFILTER) };
                 if mf.msg == WM_RBUTTONDOWN {
                     let x = loword(mf.lParam.0 as _);
                     let y = hiword(mf.lParam.0 as _);
@@ -106,7 +107,7 @@ unsafe extern "system" fn wnd_proc(
                 #[allow(clippy::single_match)]
                 match id {
                     ID_COPY => {
-                        SendMessageW(hedit.handle(), WM_COPY, None, None);
+                        unsafe { SendMessageW(hedit.handle(), WM_COPY, None, None) };
                     }
                     _ => (),
                 }
@@ -127,7 +128,7 @@ unsafe extern "system" fn wnd_proc(
             }
         }
         WM_DESTROY => destroy(hwnd),
-        _ => return DefWindowProcW(hwnd, msg, wparam, lparam),
+        _ => return unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
     LRESULT::default()
 }
@@ -320,13 +321,13 @@ fn destroy(hwnd: HWND) {
 
 unsafe extern "system" fn enum_win(hwnd: HWND, lparam: LPARAM) -> BOOL {
     let mut buf = [0; 24];
-    GetWindowTextW(hwnd, &mut buf);
+    unsafe { GetWindowTextW(hwnd, &mut buf) };
     if buf.starts_with(TITLE) {
         if lparam.0 > 0 {
-            if IsIconic(hwnd).as_bool() {
-                _ = ShowWindow(hwnd, SW_SHOW);
+            if unsafe { IsIconic(hwnd).as_bool() } {
+                _ = unsafe { ShowWindow(hwnd, SW_SHOW) };
             }
-            _ = SetForegroundWindow(hwnd);
+            _ = unsafe { SetForegroundWindow(hwnd) };
         }
         return false.into();
     }

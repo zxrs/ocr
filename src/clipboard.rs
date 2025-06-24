@@ -85,7 +85,7 @@ impl Dib {
     }
 
     fn scan_line_bytes_count_with_padding(&self) -> usize {
-        (self.width as usize * self.bits_per_pixel as usize + 31) / 32 * 4
+        (self.width as usize * self.bits_per_pixel as usize).div_ceil(32) * 4
     }
 
     fn to_bgra(&self) -> Result<Vec<u8>> {

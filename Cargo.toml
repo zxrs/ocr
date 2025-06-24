@@ -1,14 +1,14 @@
 [package]
 name = "ocr"
 version = "0.4.2"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 anyhow = "1.0"
 utf16_lit = "2.0"
 
 [dependencies.windows]
-version = "0.60"
+version = "0.61"
 features = [
     "Graphics_Imaging",
     "Foundation",
