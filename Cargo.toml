@@ -8,7 +8,7 @@ anyhow = "1.0"
 utf16_lit = "2.0"
 
 [dependencies.windows]
-version = "0.61"
+version = "0.62"
 features = [
     "Graphics_Imaging",
     "Foundation",
@@ -30,6 +30,13 @@ features = [
 
 [profile.dev]
 debug = 0
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.debugging]
+inherits = "dev"
+debug = true
 
 [profile.release]
 lto = "fat"

@@ -4,7 +4,6 @@ use std::io::{Cursor, Write};
 use std::ptr;
 use std::slice;
 use windows::{
-    core::{Interface, HSTRING},
     Globalization::Language,
     Graphics::Imaging::{BitmapBufferAccessMode, BitmapPixelFormat, SoftwareBitmap},
     Media::Ocr::OcrEngine,
@@ -12,9 +11,10 @@ use windows::{
         Foundation::{HWND, LPARAM, WPARAM},
         System::WinRT::IMemoryBufferByteAccess,
         UI::WindowsAndMessaging::{
-            GetDlgItem, SendMessageW, CB_GETCURSEL, CB_GETLBTEXT, CB_GETLBTEXTLEN,
+            CB_GETCURSEL, CB_GETLBTEXT, CB_GETLBTEXTLEN, GetDlgItem, SendMessageW,
         },
     },
+    core::{HSTRING, Interface},
 };
 
 pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) -> Result<usize> {
@@ -75,7 +75,7 @@ pub fn scan(hwnd: HWND, width: i32, height: i32, bgra: Vec<u8>, buf: &mut [u8]) 
     let mut cur = Cursor::new(buf);
     engine
         .RecognizeAsync(&bmp)?
-        .get()?
+        .join()?
         .Lines()?
         .First()?
         .try_for_each(|line| -> Result<()> {
