@@ -1,8 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use anyhow::{Context, Result};
-use std::sync::OnceLock;
-use std::{collections::HashMap, slice};
+use std::{collections::HashMap, slice, sync::OnceLock};
 use utf16_lit::utf16_null;
 use windows::{
     Media::Ocr::OcrEngine,
