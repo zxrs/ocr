@@ -112,6 +112,7 @@ unsafe extern "system" fn wnd_proc(
                 }
             }
         }
+        #[rustfmt::skip]
         WM_CLIPBOARDUPDATE => {
             // Adobe PDF reader:    WPARAM(0 | 3 | 5 | 6)
             // Firefox:             WPARAM(6 | 4)
@@ -122,7 +123,7 @@ unsafe extern "system" fn wnd_proc(
                 || wparam.eq(&WPARAM(4))
                 || wparam.eq(&WPARAM(6))
                 || wparam.eq(&WPARAM(7))
-            // || wparam.eq(&WPARAM(8)) // DO NOT COMMENT OUT!! to avoid heap corruption...
+                || wparam.eq(&WPARAM(8)) // no matter
             {
                 ocr(hwnd).ok();
             }

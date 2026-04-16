@@ -1,19 +1,17 @@
-use anyhow::{anyhow, ensure, Result};
+use anyhow::{Result, anyhow, ensure};
 use std::ptr;
 use std::slice;
-use windows::{
-    core::Free,
-    Win32::{
-        Foundation::{HANDLE, HGLOBAL},
-        Graphics::Gdi::BITMAPINFO,
-        System::{
-            DataExchange::{
-                CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
-                OpenClipboard, SetClipboardData,
-            },
-            Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
-            Ole::{CF_DIB, CF_UNICODETEXT},
+use windows::Win32::Foundation::GlobalFree;
+use windows::Win32::{
+    Foundation::{HANDLE, HGLOBAL},
+    Graphics::Gdi::BITMAPINFO,
+    System::{
+        DataExchange::{
+            CloseClipboard, EmptyClipboard, GetClipboardData, IsClipboardFormatAvailable,
+            OpenClipboard, SetClipboardData,
         },
+        Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock},
+        Ole::{CF_DIB, CF_UNICODETEXT},
     },
 };
 
@@ -28,7 +26,7 @@ impl Drop for Clipboard {
 struct Handle(HGLOBAL);
 impl Drop for Handle {
     fn drop(&mut self) {
-        unsafe { self.0.free() };
+        unsafe { GlobalUnlock(self.0).ok() };
     }
 }
 
@@ -36,7 +34,7 @@ impl Drop for Handle {
 struct MemoryHandle(HGLOBAL);
 impl Drop for MemoryHandle {
     fn drop(&mut self) {
-        unsafe { self.0.free() };
+        unsafe { GlobalFree(Some(self.0)).ok() };
     }
 }
 
@@ -104,13 +102,9 @@ impl Dib {
                 .collect(),
             1 => iter
                 .flat_map(|s| {
-                    BitIterator::new(s).take(self.width as usize).flat_map(|n| {
-                        if n > 0 {
-                            [255; 4]
-                        } else {
-                            [0; 4]
-                        }
-                    })
+                    BitIterator::new(s)
+                        .take(self.width as usize)
+                        .flat_map(|n| if n > 0 { [255; 4] } else { [0; 4] })
                 })
                 .collect(),
             _ => {
@@ -146,7 +140,7 @@ pub fn set(src: &[u16]) -> Result<()> {
     unsafe {
         ptr::copy_nonoverlapping(src.as_ptr() as *const u8, dst, src.len() * 2);
         let _ = GlobalUnlock(h_mem.0);
-        SetClipboardData(CF_UNICODETEXT.0 as u32, Some(HANDLE(h_mem.0 .0 as _)))?;
+        SetClipboardData(CF_UNICODETEXT.0 as u32, Some(HANDLE(h_mem.0.0 as _)))?;
     }
     Ok(())
 }
