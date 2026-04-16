@@ -118,10 +118,12 @@ unsafe extern "system" fn wnd_proc(
             // Cut & Sketch:        WPARAM(7 | 7 | 4 | 8)
             // Snipping Tool:       WPARAM(3 | 4)
             // IrfanView:           WPARAM(3)
+            // dbg!(wparam);
             if wparam.eq(&WPARAM(3))
                 || wparam.eq(&WPARAM(4))
                 || wparam.eq(&WPARAM(6))
                 || wparam.eq(&WPARAM(7))
+                || wparam.eq(&WPARAM(8))
             {
                 ocr(hwnd).ok();
             }
