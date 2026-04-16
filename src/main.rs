@@ -122,6 +122,7 @@ unsafe extern "system" fn wnd_proc(
                 || wparam.eq(&WPARAM(4))
                 || wparam.eq(&WPARAM(6))
                 || wparam.eq(&WPARAM(7))
+            // || wparam.eq(&WPARAM(8)) // DO NOT COMMENT OUT!! to avoid heap corruption...
             {
                 ocr(hwnd).ok();
             }
