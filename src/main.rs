@@ -27,11 +27,12 @@ use windows::{
                 DestroyMenu, DispatchMessageW, ES_AUTOHSCROLL, ES_AUTOVSCROLL, ES_MULTILINE,
                 ES_WANTRETURN, EnumWindows, GetClientRect, GetMessageW, GetWindowTextW, HMENU,
                 IsIconic, MF_STRING, MSG, PostQuitMessage, RegisterClassW, SB_BOTTOM, SW_SHOW,
-                SendMessageW, SetForegroundWindow, ShowWindow, TPM_LEFTALIGN, TrackPopupMenuEx,
-                TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE, WM_CLIPBOARDUPDATE, WM_COMMAND,
-                WM_COPY, WM_CREATE, WM_DESTROY, WM_NOTIFY, WM_RBUTTONDOWN, WM_VSCROLL, WNDCLASSW,
-                WS_BORDER, WS_CAPTION, WS_CHILD, WS_EX_STATICEDGE, WS_HSCROLL, WS_MINIMIZEBOX,
-                WS_OVERLAPPED, WS_SYSMENU, WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
+                SendMessageW, SetForegroundWindow, SetWindowTextW, ShowWindow, TPM_LEFTALIGN,
+                TrackPopupMenuEx, TranslateMessage, WINDOW_EX_STYLE, WINDOW_STYLE,
+                WM_CLIPBOARDUPDATE, WM_COMMAND, WM_COPY, WM_CREATE, WM_CUT, WM_DESTROY, WM_NOTIFY,
+                WM_RBUTTONDOWN, WM_VSCROLL, WNDCLASSW, WS_BORDER, WS_CAPTION, WS_CHILD,
+                WS_EX_STATICEDGE, WS_HSCROLL, WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU,
+                WS_TABSTOP, WS_VISIBLE, WS_VSCROLL,
             },
         },
     },
@@ -48,8 +49,12 @@ macro_rules! c {
 const ID_COMBO: i32 = 5457;
 const BUF_SIZE: usize = 8192;
 const ID_COPY: usize = 1000;
+const ID_CUT: usize = 1001;
+const ID_CLEAR: usize = 1002;
 
 const COPY_TEXT: PCWSTR = w!("Copy");
+const CUT_TEXT: PCWSTR = w!("Cut");
+const CLEAR_TEXT: PCWSTR = w!("Clear");
 
 static DISPLAY_NAMES: OnceLock<HashMap<Vec<u16>, Vec<u16>>> = OnceLock::new();
 static HWND_MAIN_WINDOW: OnceLock<Hwnd> = OnceLock::new();
@@ -102,11 +107,15 @@ unsafe extern "system" fn wnd_proc(
         WM_COMMAND => {
             let id = loword(wparam.0 as u32) as usize;
             if let Some(hedit) = HWND_RICH_EDIT.get() {
-                // Some ID_XXX will be added in the future...
-                #[allow(clippy::single_match)]
                 match id {
                     ID_COPY => {
                         unsafe { SendMessageW(hedit.handle(), WM_COPY, None, None) };
+                    }
+                    ID_CUT => {
+                        unsafe { SendMessageW(hedit.handle(), WM_CUT, None, None) };
+                    }
+                    ID_CLEAR => {
+                        _ = unsafe { SetWindowTextW(hedit.handle(), w!("")) };
                     }
                     _ => (),
                 }
@@ -251,6 +260,8 @@ fn create(hwnd: HWND) {
 fn open_popup_menu(hwnd: HWND, x: u16, y: u16) -> Result<()> {
     let hmenu = unsafe { CreatePopupMenu()? };
     unsafe { AppendMenuW(hmenu, MF_STRING, ID_COPY, COPY_TEXT)? };
+    unsafe { AppendMenuW(hmenu, MF_STRING, ID_CUT, CUT_TEXT)? };
+    unsafe { AppendMenuW(hmenu, MF_STRING, ID_CLEAR, CLEAR_TEXT)? };
 
     let mut pt = POINT {
         x: x as _,
